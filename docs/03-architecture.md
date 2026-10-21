@@ -177,11 +177,12 @@ defineEffect({
    - MP4：H.264（`avc1.*`）、音声 AAC（`mp4a.40.2`）
    - WebM：VP9 / AV1、音声 Opus
    - 使えるかどうかを `isConfigSupported()` で確認し、使えない組み合わせは選択肢に出さない（例：AAC エンコーダーがない環境では WebM か Opus を提案）
-3. 音声は `OfflineAudioContext` でミックスを一括生成し、`AudioEncoder` へ。
+3. 音声はプレビューと共通のミキサーで 1 秒ずつミックスし、`AudioEncoder` へ。映像と交互に書き込んでメモリにためすぎないようにする。
 4. Mediabunny で MP4 / WebM に多重化する。
    - Chromium 系：File System Access API の書き込みストリームへ直接書き出す（大きなファイルでもメモリを圧迫しない）
    - その他：メモリ上に作ってからダウンロード（長さの上限を警告で案内）
-5. 書き出しは ExportWorker（`OffscreenCanvas` + WebGL2）で行い、UI を止めない。進捗・残り時間・キャンセルを表示する。
+5. 書き出しは `OffscreenCanvas` + WebGL2 の専用レンダラーで 1 フレームずつ非同期に処理し、UI を止めない（Worker 化は性能改善で検討）。進捗・残り時間・中止を表示する。中止したときは保存先のファイルを確定させない。
+6. 同じ仕組みで、現在のフレームの PNG 保存と、音声のみの WAV 書き出しもできる。
 
 ## 10. 保存・復元
 

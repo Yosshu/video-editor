@@ -21,7 +21,7 @@ const FILE_TYPES: FilePickerAcceptType[] = [
 ];
 
 function suggestedName(): string {
-  return getState().fileName ?? `新しいプロジェクト${PROJECT_EXTENSION}`;
+  return getState().fileName ?? `project${PROJECT_EXTENSION}`;
 }
 
 /** 編集ファイルを保存する。成功したら true */

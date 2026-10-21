@@ -149,9 +149,15 @@ export class Renderer {
   }
 
   /** シーンの大きさと、シーン 1px あたりの出力ピクセル数を設定する */
-  setSize(sceneWidth: number, sceneHeight: number, pixelScale: number): void {
-    const w = Math.max(1, Math.round(sceneWidth * pixelScale));
-    const h = Math.max(1, Math.round(sceneHeight * pixelScale));
+  setSize(
+    sceneWidth: number,
+    sceneHeight: number,
+    pixelScale: number,
+    /** 出力サイズを直接指定する（書き出しで偶数にそろえるときなど） */
+    output?: { width: number; height: number },
+  ): void {
+    const w = output?.width ?? Math.max(1, Math.round(sceneWidth * pixelScale));
+    const h = output?.height ?? Math.max(1, Math.round(sceneHeight * pixelScale));
     this.sceneWidth = sceneWidth;
     this.sceneHeight = sceneHeight;
     this.pixelScale = pixelScale;

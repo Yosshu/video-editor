@@ -18,6 +18,8 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+    // 動画処理ライブラリを含むため 1 ファイルが大きめ（圧縮後で約 300KB）
+    chunkSizeWarningLimit: 1500,
   },
   test: {
     include: ['src/**/*.test.ts'],
