@@ -54,11 +54,8 @@ export class OfflineRenderer {
       this.media,
       this.width / scene.width,
     );
-    this.renderer.render(
-      composed.map((c) => c.draw),
-      project.settings.backgroundColor,
-    );
-    this.renderer.pruneTextures(new Set(composed.map((c) => c.draw.key)));
+    this.renderer.render(composed.ops, project.settings.backgroundColor);
+    this.renderer.pruneTextures(composed.textureKeys);
   }
 
   dispose(): void {

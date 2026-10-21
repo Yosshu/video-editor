@@ -149,10 +149,12 @@
 }
 ```
 
-- `type` の種類（現在）：`video` `image` `audio` `text` `shape` `solid`。今後 `scene`（シーン）、`filter` `group` `timeControl` `camera` `partialFilter`（制御オブジェクト）を追加する。
+- `type` の種類（現在）：`video` `image` `audio` `text` `shape` `solid`（メディア）、`filter`（フィルタオブジェクト：自分より上のレイヤー全体にエフェクトをかける）。今後 `scene`（シーン）、`group` `timeControl` `camera` `partialFilter`（制御オブジェクト）を追加する。
+- `effects` はオブジェクトに上から順に適用するエフェクト。`type` の種類：`colorAdjust`（色調補正）`monochrome`（単色化）`blur`（ぼかし）`edgeBlur`（境界ぼかし）`mosaic`（モザイク）`sharpen`（シャープ）`glow`（発光）`outline`（縁取り）`dropShadow`（ドロップシャドウ）`crop`（クリッピング）`mask`（図形マスク）`chromaKey` `colorKey` `lumaKey`（キー抜き）。エフェクトのパラメータもキーフレームで変化させられる（形式はオブジェクトのパラメータと同じ）。知らない種類のエフェクトは描画せずにそのまま残す。
 - パラメータはオブジェクトの種類ごとに定義されている（`src/core/objects/definitions.ts`）。省略したパラメータは既定値とみなす（ファイルを小さく保ち、既定値の変更にも追従しやすくする）。
 - 主なパラメータ
-  - 配置：`x` `y`（px、画面中央が原点）、`scale`（%）、`rotation`（度）、`opacity`（%）、`flipH` `flipV`、`blend`（合成モード）
+  - 配置：`x` `y`（px、画面中央が原点）、`scale`（%）、`rotation`（度）、`opacity`（%）、`flipH` `flipV`、`blend`（合成モード）、`clipUpper`（上のオブジェクトでクリッピング）
+  - 登場・退場：`enterType` `exitType`（`fade` `slideLeft` `zoom` `wipeLeft` `circle` など）、`enterDuration` `exitDuration`（秒）
   - フェード：`fadeIn` `fadeOut`（秒）
   - 動画・音声：`offset`（素材の再生開始位置、秒）、`speed`（%）、`loop`、`volume`（%）、`pan`（-100〜100）
   - テキスト：`text` `font` `size` `color` `bold` `italic` `align` `lineHeight` `letterSpacing` `outlineWidth` `outlineColor` `shadow` など

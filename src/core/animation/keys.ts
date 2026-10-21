@@ -1,4 +1,11 @@
-import type { Animated, Ease, Keyframe, ParamMap, ParamValue } from '../model/types';
+import type {
+  Animated,
+  Ease,
+  Keyframe,
+  ParamMap,
+  ParamValue,
+  TimelineObject,
+} from '../model/types';
 import { isAnimated, keysValueAt, normalizeKeys } from './interpolate';
 
 /** 数値パラメータの現在値（固定値・アニメーションのどちらでも） */
@@ -90,6 +97,15 @@ export function keyTimes(params: ParamMap, length: number): number[] {
     if (!isAnimated(v)) continue;
     for (const k of v.keys) if (k.t >= 0 && k.t < length) set.add(k.t);
   }
+  return [...set].sort((a, b) => a - b);
+}
+
+/** オブジェクトとそのエフェクトのすべてのキーの時刻 */
+export function objectKeyTimes(
+  obj: Pick<TimelineObject, 'params' | 'effects' | 'length'>,
+): number[] {
+  const set = new Set(keyTimes(obj.params, obj.length));
+  for (const e of obj.effects) for (const t of keyTimes(e.params, obj.length)) set.add(t);
   return [...set].sort((a, b) => a - b);
 }
 

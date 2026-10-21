@@ -23,7 +23,117 @@ export const BLEND_MODES = [
   { value: 'screen', label: 'スクリーン' },
   { value: 'lighten', label: '比較（明）' },
   { value: 'darken', label: '比較（暗）' },
+  { value: 'overlay', label: 'オーバーレイ' },
+  { value: 'softLight', label: 'ソフトライト' },
+  { value: 'hardLight', label: 'ハードライト' },
+  { value: 'colorDodge', label: '覆い焼き' },
+  { value: 'colorBurn', label: '焼き込み' },
+  { value: 'difference', label: '差分' },
+  { value: 'exclusion', label: '除外' },
 ] as const;
+
+/** GPU の合成機能だけで処理できる合成モード（それ以外はシェーダーで合成する） */
+export const SIMPLE_BLEND_MODES: readonly string[] = [
+  'normal',
+  'add',
+  'subtract',
+  'multiply',
+  'screen',
+  'lighten',
+  'darken',
+];
+
+export const TRANSITIONS = [
+  'none',
+  'fade',
+  'slideLeft',
+  'slideRight',
+  'slideUp',
+  'slideDown',
+  'zoom',
+  'wipeLeft',
+  'wipeRight',
+  'wipeUp',
+  'wipeDown',
+  'circle',
+] as const;
+
+export type TransitionType = (typeof TRANSITIONS)[number];
+
+const ENTER_LABELS: Record<TransitionType, string> = {
+  none: 'なし',
+  fade: 'フェード',
+  slideLeft: '左から入る',
+  slideRight: '右から入る',
+  slideUp: '上から入る',
+  slideDown: '下から入る',
+  zoom: '拡大して登場',
+  wipeLeft: 'ワイプ（左から）',
+  wipeRight: 'ワイプ（右から）',
+  wipeUp: 'ワイプ（上から）',
+  wipeDown: 'ワイプ（下から）',
+  circle: '円形に広がる',
+};
+
+const EXIT_LABELS: Record<TransitionType, string> = {
+  none: 'なし',
+  fade: 'フェード',
+  slideLeft: '左へ出る',
+  slideRight: '右へ出る',
+  slideUp: '上へ出る',
+  slideDown: '下へ出る',
+  zoom: '縮小して退場',
+  wipeLeft: 'ワイプ（左へ）',
+  wipeRight: 'ワイプ（右へ）',
+  wipeUp: 'ワイプ（上へ）',
+  wipeDown: 'ワイプ（下へ）',
+  circle: '円形に閉じる',
+};
+
+const TRANSITION_PARAMS: ParamDef[] = [
+  {
+    id: 'enterType',
+    label: '登場',
+    kind: 'select',
+    default: 'none',
+    options: TRANSITIONS.map((t) => ({ value: t, label: ENTER_LABELS[t] })),
+    group: '登場・退場',
+  },
+  {
+    id: 'enterDuration',
+    label: '登場の時間',
+    kind: 'number',
+    default: 0.5,
+    min: 0.01,
+    max: 60,
+    sliderMax: 3,
+    step: 0.01,
+    unit: '秒',
+    group: '登場・退場',
+    visibleIf: (v) => v.enterType !== 'none',
+  },
+  {
+    id: 'exitType',
+    label: '退場',
+    kind: 'select',
+    default: 'none',
+    options: TRANSITIONS.map((t) => ({ value: t, label: EXIT_LABELS[t] })),
+    group: '登場・退場',
+  },
+  {
+    id: 'exitDuration',
+    label: '退場の時間',
+    kind: 'number',
+    default: 0.5,
+    min: 0.01,
+    max: 60,
+    sliderMax: 3,
+    step: 0.01,
+    unit: '秒',
+    group: '登場・退場',
+    visibleIf: (v) => v.exitType !== 'none',
+  },
+];
 
 export type BlendMode = (typeof BLEND_MODES)[number]['value'];
 
@@ -98,6 +208,13 @@ const TRANSFORM_PARAMS: ParamDef[] = [
     kind: 'select',
     default: 'normal',
     options: [...BLEND_MODES],
+    group: '配置',
+  },
+  {
+    id: 'clipUpper',
+    label: '上のオブジェクトでクリッピング',
+    kind: 'boolean',
+    default: false,
     group: '配置',
   },
 ];
@@ -207,6 +324,7 @@ export const OBJECT_TYPES: Record<ObjectType, ObjectTypeDef> = {
       ...AUDIO_PARAMS,
       { id: 'mute', label: '音声を使わない', kind: 'boolean', default: false, group: '音声' },
       ...FADE_PARAMS,
+      ...TRANSITION_PARAMS,
     ],
   },
   image: {
@@ -216,7 +334,7 @@ export const OBJECT_TYPES: Record<ObjectType, ObjectTypeDef> = {
     visual: true,
     audio: false,
     assetKind: 'image',
-    params: [...TRANSFORM_PARAMS, ...FADE_PARAMS],
+    params: [...TRANSFORM_PARAMS, ...FADE_PARAMS, ...TRANSITION_PARAMS],
   },
   audio: {
     type: 'audio',
@@ -363,6 +481,7 @@ export const OBJECT_TYPES: Record<ObjectType, ObjectTypeDef> = {
       },
       ...TRANSFORM_PARAMS,
       ...FADE_PARAMS,
+      ...TRANSITION_PARAMS,
     ],
   },
   shape: {
@@ -446,7 +565,16 @@ export const OBJECT_TYPES: Record<ObjectType, ObjectTypeDef> = {
       },
       ...TRANSFORM_PARAMS,
       ...FADE_PARAMS,
+      ...TRANSITION_PARAMS,
     ],
+  },
+  filter: {
+    type: 'filter',
+    label: 'フィルタ',
+    color: '#8a6d3b',
+    visual: true,
+    audio: false,
+    params: [],
   },
   solid: {
     type: 'solid',
@@ -458,6 +586,7 @@ export const OBJECT_TYPES: Record<ObjectType, ObjectTypeDef> = {
       { id: 'color', label: '色', kind: 'color', default: '#ffffff', group: '単色' },
       ...TRANSFORM_PARAMS,
       ...FADE_PARAMS,
+      ...TRANSITION_PARAMS,
     ],
   },
 };

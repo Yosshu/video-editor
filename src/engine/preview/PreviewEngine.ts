@@ -57,20 +57,17 @@ export class PreviewEngine {
     const state = getState();
     const scene = currentScene(state);
     this.renderer.setSize(scene.width, scene.height, state.previewQuality);
-    const items = this.compositor.compose(
+    const frame = this.compositor.compose(
       state.project,
       scene,
       state.playhead,
       this.media,
       state.previewQuality,
     );
-    this.renderer.render(
-      items.map((i) => i.draw),
-      state.project.settings.backgroundColor,
-    );
-    this.renderer.pruneTextures(new Set(items.map((i) => i.draw.key)));
-    this.lastItems = items;
-    for (const l of this.listeners) l(items);
+    this.renderer.render(frame.ops, state.project.settings.backgroundColor);
+    this.renderer.pruneTextures(frame.textureKeys);
+    this.lastItems = frame.items;
+    for (const l of this.listeners) l(frame.items);
   }
 
   dispose(): void {

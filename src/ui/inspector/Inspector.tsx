@@ -8,28 +8,33 @@ import {
   setParamAtPlayhead,
   toggleKeyAtPlayhead,
 } from '../../app/animationActions';
+import { addEffect, moveEffect, removeEffect, setEffectEnabled } from '../../app/effectActions';
 import { EASE_OPTIONS } from '../../core/animation/ease';
-import { isAnimated } from '../../core/animation/interpolate';
-import { easeAt, hasKeyAt, keyTimes } from '../../core/animation/keys';
+import { isAnimated, valueAt } from '../../core/animation/interpolate';
+import { easeAt, hasKeyAt, objectKeyTimes } from '../../core/animation/keys';
+import { EFFECT_CATEGORIES, EFFECTS, getEffectDef } from '../../core/effects/definitions';
 import { resolveParams } from '../../core/evaluate/evaluate';
 import { formatTimecode, fpsValue } from '../../core/model/time';
-import type { Ease, TimelineObject } from '../../core/model/types';
+import type { Ease, EffectInstance, ParamMap, TimelineObject } from '../../core/model/types';
 import { getObjectDef } from '../../core/objects/definitions';
 import type { NumberParamDef, ParamDef } from '../../core/params/defs';
 import { currentScene, useEditor } from '../../state/store';
 import { EaseEditor } from './EaseEditor';
 import { BoolField, ColorField, FontField, NumberField, SelectField, TextField } from './fields';
 
-function KeyControls({
-  obj,
-  def,
-  local,
-}: {
+/** 編集対象のパラメータ（オブジェクト自身か、そのエフェクトか） */
+interface Target {
   obj: TimelineObject;
-  def: NumberParamDef;
+  /** エフェクトのパラメータなら、そのエフェクトの ID */
+  effectId?: string;
+  params: ParamMap;
+  /** オブジェクト内の相対フレーム */
   local: number;
-}) {
-  const value = obj.params[def.id];
+}
+
+function KeyControls({ target, def }: { target: Target; def: NumberParamDef }) {
+  const { obj, effectId, params, local } = target;
+  const value = params[def.id];
   const animated = isAnimated(value);
   const onKey = hasKeyAt(value, local);
   return (
@@ -40,7 +45,7 @@ function KeyControls({
           className="key-button"
           title="前のキーへ"
           aria-label={`${def.label}の前のキーへ`}
-          onClick={() => jumpToKey(obj.id, def.id, -1)}
+          onClick={() => jumpToKey(obj.id, def.id, -1, effectId)}
         >
           ◀
         </button>
@@ -51,7 +56,7 @@ function KeyControls({
         title={onKey ? 'この時刻のキーを削除' : 'この時刻にキーを追加（アニメーション）'}
         aria-label={`${def.label}のキーフレーム`}
         aria-pressed={onKey}
-        onClick={() => toggleKeyAtPlayhead(obj.id, def.id, def.default)}
+        onClick={() => toggleKeyAtPlayhead(obj.id, def.id, def.default, effectId)}
       >
         {onKey ? '◆' : '◇'}
       </button>
@@ -61,7 +66,7 @@ function KeyControls({
           className="key-button"
           title="次のキーへ"
           aria-label={`${def.label}の次のキーへ`}
-          onClick={() => jumpToKey(obj.id, def.id, 1)}
+          onClick={() => jumpToKey(obj.id, def.id, 1, effectId)}
         >
           ▶
         </button>
@@ -70,8 +75,9 @@ function KeyControls({
   );
 }
 
-function EaseRow({ obj, def, local }: { obj: TimelineObject; def: NumberParamDef; local: number }) {
-  const value = obj.params[def.id];
+function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
+  const { obj, effectId, params, local } = target;
+  const value = params[def.id];
   if (!isAnimated(value) || value.keys.length < 2) return null;
   const ease = easeAt(value, local);
   const selectValue = ease === undefined ? 'linear' : typeof ease === 'object' ? 'bezier' : ease;
@@ -88,6 +94,7 @@ function EaseRow({ obj, def, local }: { obj: TimelineObject; def: NumberParamDef
               obj.id,
               def.id,
               v === 'bezier' ? { bezier: [0.25, 0.1, 0.25, 1] } : (v as Ease),
+              effectId,
             );
           }}
         >
@@ -102,12 +109,12 @@ function EaseRow({ obj, def, local }: { obj: TimelineObject; def: NumberParamDef
       <button
         type="button"
         className="link-button"
-        onClick={() => clearParamAnimation(obj.id, def.id, def.default)}
+        onClick={() => clearParamAnimation(obj.id, def.id, def.default, effectId)}
       >
         アニメーションを解除
       </button>
       {selectValue === 'bezier' && (
-        <EaseEditor ease={ease} onChange={(e) => setEaseAtPlayhead(obj.id, def.id, e)} />
+        <EaseEditor ease={ease} onChange={(e) => setEaseAtPlayhead(obj.id, def.id, e, effectId)} />
       )}
     </div>
   );
@@ -115,19 +122,17 @@ function EaseRow({ obj, def, local }: { obj: TimelineObject; def: NumberParamDef
 
 function ParamField({
   def,
-  obj,
-  values,
+  target,
+  value,
   disabled,
-  local,
 }: {
   def: ParamDef;
-  obj: TimelineObject;
-  values: Record<string, unknown>;
+  target: Target;
+  value: unknown;
   disabled: boolean;
-  local: number;
 }) {
-  const value = values[def.id];
-  const change = (v: number | string | boolean) => setParamAtPlayhead(obj.id, def.id, v);
+  const change = (v: number | string | boolean) =>
+    setParamAtPlayhead(target.obj.id, def.id, v, target.effectId);
   switch (def.kind) {
     case 'number':
       return (
@@ -138,12 +143,10 @@ function ParamField({
             onChange={change}
             disabled={disabled}
             extra={
-              def.animatable && !disabled ? (
-                <KeyControls obj={obj} def={def} local={local} />
-              ) : undefined
+              def.animatable && !disabled ? <KeyControls target={target} def={def} /> : undefined
             }
           />
-          {def.animatable && !disabled && <EaseRow obj={obj} def={def} local={local} />}
+          {def.animatable && !disabled && <EaseRow target={target} def={def} />}
         </>
       );
     case 'color':
@@ -169,6 +172,144 @@ function groupParams(params: ParamDef[]): [string, ParamDef[]][] {
   return [...groups.entries()];
 }
 
+function EffectCard({
+  obj,
+  effect,
+  index,
+  count,
+  local,
+  disabled,
+}: {
+  obj: TimelineObject;
+  effect: EffectInstance;
+  index: number;
+  count: number;
+  local: number;
+  disabled: boolean;
+}) {
+  const def = getEffectDef(effect.type);
+  const target: Target = { obj, effectId: effect.id, params: effect.params, local };
+  const values = Object.fromEntries(
+    (def?.params ?? []).map((p) => [p.id, valueAt(effect.params[p.id], local, p.default as never)]),
+  );
+  return (
+    <details open className={`effect-card ${effect.enabled ? '' : 'disabled-effect'}`}>
+      <summary>
+        <input
+          type="checkbox"
+          checked={effect.enabled}
+          disabled={disabled}
+          aria-label={`${def?.label ?? effect.type}を有効にする`}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setEffectEnabled(obj.id, effect.id, e.target.checked)}
+        />
+        <span className="effect-name">
+          {def?.label ?? `${effect.type}（このバージョンでは使えません）`}
+        </span>
+        <span className="effect-buttons">
+          <button
+            type="button"
+            className="key-button"
+            disabled={disabled || index === 0}
+            aria-label="上へ"
+            title="上へ（先に適用）"
+            onClick={(e) => {
+              e.preventDefault();
+              moveEffect(obj.id, effect.id, -1);
+            }}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="key-button"
+            disabled={disabled || index === count - 1}
+            aria-label="下へ"
+            title="下へ（後で適用）"
+            onClick={(e) => {
+              e.preventDefault();
+              moveEffect(obj.id, effect.id, 1);
+            }}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className="key-button"
+            disabled={disabled}
+            aria-label={`${def?.label ?? effect.type}を削除`}
+            title="削除"
+            onClick={(e) => {
+              e.preventDefault();
+              removeEffect(obj.id, effect.id);
+            }}
+          >
+            ×
+          </button>
+        </span>
+      </summary>
+      {def?.params
+        .filter((p) => !p.visibleIf || p.visibleIf(values))
+        .map((p) => (
+          <ParamField key={p.id} def={p} target={target} value={values[p.id]} disabled={disabled} />
+        ))}
+    </details>
+  );
+}
+
+function EffectsSection({
+  obj,
+  local,
+  disabled,
+}: {
+  obj: TimelineObject;
+  local: number;
+  disabled: boolean;
+}) {
+  return (
+    <details open className="param-group effects-section">
+      <summary>エフェクト{obj.effects.length > 0 ? `（${obj.effects.length}）` : ''}</summary>
+      {obj.effects.map((e, i) => (
+        <EffectCard
+          key={e.id}
+          obj={obj}
+          effect={e}
+          index={i}
+          count={obj.effects.length}
+          local={local}
+          disabled={disabled}
+        />
+      ))}
+      {!disabled && (
+        <select
+          className="add-effect"
+          aria-label="エフェクトを追加"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) addEffect(obj.id, e.target.value);
+          }}
+        >
+          <option value="">＋ エフェクトを追加…</option>
+          {EFFECT_CATEGORIES.map((c) => (
+            <optgroup key={c} label={c}>
+              {EFFECTS.filter((d) => d.category === c).map((d) => (
+                <option key={d.type} value={d.type}>
+                  {d.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      )}
+      {obj.type === 'filter' && obj.effects.length === 0 && (
+        <p className="hint">
+          フィルタは、自分より上のレイヤーをすべて合成した画面にエフェクトをかけます。
+        </p>
+      )}
+    </details>
+  );
+}
+
 function ObjectInspector({ obj }: { obj: TimelineObject }) {
   const fps = useEditor((s) => s.project.settings.fps);
   const playhead = useEditor((s) => s.playhead);
@@ -181,6 +322,8 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
   const def = getObjectDef(obj.type);
   const local = Math.min(Math.max(0, playhead - obj.start), obj.length - 1);
   const values = resolveParams(obj, local);
+  const target: Target = { obj, params: obj.params, local };
+  const keys = objectKeyTimes(obj);
 
   return (
     <div className="inspector-content">
@@ -195,7 +338,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
         )}
       </div>
       {locked && <p className="hint">レイヤーがロックされているため編集できません。</p>}
-      {!locked && getObjectDef(obj.type).visual && (
+      {!locked && def.visual && (
         <div className="midpoint-row">
           <button
             type="button"
@@ -207,15 +350,11 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
           <button
             type="button"
             onClick={() => removeMidpointAtPlayhead(obj.id)}
-            disabled={!keyTimes(obj.params, obj.length).includes(local)}
+            disabled={!keys.includes(local)}
           >
             中間点を削除
           </button>
-          <span className="dim">
-            {keyTimes(obj.params, obj.length).length > 0
-              ? `キー ${keyTimes(obj.params, obj.length).length} 個`
-              : ''}
-          </span>
+          <span className="dim">{keys.length > 0 ? `キー ${keys.length} 個` : ''}</span>
         </div>
       )}
       <details open className="param-group">
@@ -260,15 +399,15 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
               <ParamField
                 key={p.id}
                 def={p}
-                obj={obj}
-                values={values}
+                target={target}
+                value={values[p.id]}
                 disabled={locked}
-                local={local}
               />
             ))}
           </details>
         );
       })}
+      {def.visual && <EffectsSection obj={obj} local={local} disabled={locked} />}
     </div>
   );
 }

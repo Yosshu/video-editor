@@ -1129,3 +1129,47 @@ kbd {
   align-items: center;
   gap: 4px;
 }
+
+/* ---------- エフェクト ---------- */
+
+.effect-card {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 8px 8px;
+  margin-top: 6px;
+  background: var(--bg-elevated);
+}
+
+.effect-card.disabled-effect {
+  opacity: 0.55;
+  border-left-color: var(--border);
+}
+
+.effect-card summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.effect-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.effect-name {
+  flex: 1;
+  font-size: 12px;
+}
+
+.effect-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.add-effect {
+  width: 100%;
+  margin-top: 8px;
+}

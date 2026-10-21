@@ -14,10 +14,11 @@ import {
 } from '../../app/actions';
 import { moveMidpointOf } from '../../app/animationActions';
 import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
-import { keyTimes } from '../../core/animation/keys';
+import { objectKeyTimes } from '../../core/animation/keys';
 import { openProjectFile } from '../../app/projectFile';
 import { framesToSeconds, secondsToFrames } from '../../core/model/time';
 import type { Asset, ObjectType, Rational, Scene, TimelineObject } from '../../core/model/types';
+import { getEffectDef } from '../../core/effects/definitions';
 import { getObjectDef } from '../../core/objects/definitions';
 import {
   collectSnapPoints,
@@ -59,6 +60,10 @@ interface Viewport {
 }
 
 function objectLabel(obj: TimelineObject, assets: Asset[]): string {
+  if (obj.type === 'filter') {
+    const names = obj.effects.map((e) => getEffectDef(e.type)?.label ?? e.type);
+    return names.length > 0 ? `フィルタ：${names.join('・')}` : 'フィルタ';
+  }
   if (obj.type === 'text')
     return String(obj.params.text ?? 'テキスト').split('\n')[0] || 'テキスト';
   if (obj.assetId)
@@ -134,7 +139,7 @@ const ObjectItem = memo(function ObjectItem({
       <span className="tl-object-label">{label}</span>
       {!ghost &&
         width > 24 &&
-        keyTimes(obj.params, obj.length)
+        objectKeyTimes(obj)
           .filter((t) => t > 0)
           .map((t) => (
             <span
@@ -587,6 +592,7 @@ export function Timeline() {
       { label: 'テキストを追加', action: add('text') },
       { label: '図形を追加', action: add('shape') },
       { label: '単色を追加', action: add('solid') },
+      { label: 'フィルタを追加（上のレイヤー全体にエフェクト）', action: add('filter') },
       {
         label: '動画・画像・音声ファイルを追加…',
         action: async () => {

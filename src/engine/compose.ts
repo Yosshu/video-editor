@@ -2,7 +2,7 @@ import { evaluateFrame, type VisualItem } from '../core/evaluate/evaluate';
 import type { Project, Scene } from '../core/model/types';
 import type { BlendMode } from '../core/objects/definitions';
 import type { Mat3 } from './render/gl';
-import type { DrawItem } from './render/Renderer';
+import type { DrawItem, RenderOp } from './render/Renderer';
 import {
   RasterCache,
   rasterizeShape,
@@ -34,6 +34,14 @@ export interface ComposedItem {
   objectId: string;
   layer: number;
   draw: DrawItem;
+}
+
+/** 1 フレーム分の描画手順と、画面に見えているオブジェクト */
+export interface ComposedFrame {
+  ops: RenderOp[];
+  items: ComposedItem[];
+  /** 使用中のテクスチャのキー（使われなくなったものを解放するため） */
+  textureKeys: Set<string>;
 }
 
 const UV_ROTATION: Record<0 | 90 | 180 | 270, Mat3> = {
@@ -106,15 +114,20 @@ export class Compositor {
   ): DrawItem | null {
     const p = item.params;
     const obj = item.object;
+    const m = item.motion;
+    const scale = (Number(p.scale) / 100) * m.scale;
     const base = {
       key: obj.id,
-      x: Number(p.x),
-      y: Number(p.y),
-      scaleX: (Number(p.scale) / 100) * (p.flipH ? -1 : 1),
-      scaleY: (Number(p.scale) / 100) * (p.flipV ? -1 : 1),
+      x: Number(p.x) + m.dx,
+      y: Number(p.y) + m.dy,
+      scaleX: scale * (p.flipH ? -1 : 1),
+      scaleY: scale * (p.flipV ? -1 : 1),
       rotation: Number(p.rotation),
       opacity: item.opacity,
       blend: String(p.blend) as BlendMode,
+      effects: item.effects,
+      effectScale: pixelScale * rasterUpscale(Number(p.scale)),
+      ...(m.wipe ? { wipe: m.wipe } : {}),
     };
     switch (obj.type) {
       case 'image': {
@@ -225,17 +238,46 @@ export class Compositor {
     frame: number,
     media: MediaProvider,
     pixelScale: number,
-  ): ComposedItem[] {
+  ): ComposedFrame {
     const visual = evaluateFrame(scene, frame, {
       fps: project.settings.fps,
       assetDuration: (id) => media.assetDuration(id),
     });
-    const result: ComposedItem[] = [];
+    const ops: RenderOp[] = [];
+    const items: ComposedItem[] = [];
+    const keys = new Set<string>();
+    // 直前に描いたオブジェクト（上のオブジェクトでクリッピングの対象）
+    let previous: { layer: number; draw: DrawItem; opIndex: number; itemIndex: number } | null =
+      null;
     for (const item of visual) {
+      if (item.object.type === 'filter') {
+        ops.push({ kind: 'filter', effects: item.effects });
+        previous = null;
+        continue;
+      }
       const draw = this.drawItemFor(item, project, scene, media, pixelScale);
-      if (draw) result.push({ objectId: item.object.id, layer: item.object.layer, draw });
+      if (!draw) {
+        previous = null;
+        continue;
+      }
+      keys.add(draw.key);
+      const layer = item.object.layer;
+      if (item.params.clipUpper === true) {
+        // 直上のレイヤーのオブジェクトの形で切り抜く（上のオブジェクト自体は描かない）
+        if (previous && previous.layer === layer - 1) {
+          ops.splice(previous.opIndex, 1);
+          items.splice(previous.itemIndex, 1);
+          ops.push({ kind: 'draw', item: draw, mask: previous.draw });
+          items.push({ objectId: item.object.id, layer, draw });
+        }
+        previous = null;
+        continue;
+      }
+      ops.push({ kind: 'draw', item: draw });
+      items.push({ objectId: item.object.id, layer, draw });
+      previous = { layer, draw, opIndex: ops.length - 1, itemIndex: items.length - 1 };
     }
     this.rasters.prune(new Set(scene.objects.map((o) => o.id)));
-    return result;
+    return { ops, items, textureKeys: keys };
   }
 }
