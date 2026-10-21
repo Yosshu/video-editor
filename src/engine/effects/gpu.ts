@@ -246,6 +246,24 @@ void main() {
   outColor = vec4(rgb * a, a);
 }`,
 
+  // 部分フィルタ：範囲の中だけ uTex（エフェクト後）、外は uOrig（元の画面）
+  regionMix: `
+uniform sampler2D uOrig; uniform vec2 uCenter; uniform vec2 uHalf; uniform float uFeather; uniform float uEllipse; uniform float uInvert;
+void main() {
+  vec2 p = outPx() - uCenter;
+  float d;
+  if (uEllipse > 0.5) {
+    vec2 q = p / max(uHalf, vec2(0.001));
+    d = (length(q) - 1.0) * min(uHalf.x, uHalf.y);
+  } else {
+    vec2 q = abs(p) - uHalf;
+    d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+  }
+  float f = uFeather > 0.0 ? clamp(0.5 - d / uFeather, 0.0, 1.0) : (d <= 0.0 ? 1.0 : 0.0);
+  if (uInvert > 0.5) f = 1.0 - f;
+  outColor = mix(texture(uOrig, vUv), texture(uTex, vUv), f);
+}`,
+
   // 登場・退場のワイプ。uKind: 0=左から 1=右から 2=上から 3=下から 4=円。uProgress=1 で全体が見える
   wipe: `
 uniform float uKind; uniform float uProgress;

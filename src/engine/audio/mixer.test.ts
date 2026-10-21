@@ -91,3 +91,43 @@ describe('panGains', () => {
     expect(panGains(50)).toEqual([0.5, 1]);
   });
 });
+
+describe('シーンオブジェクトの音声', () => {
+  it('入れ子のシーンの音声を、シーンオブジェクトの位置と音量でミックスする', async () => {
+    const project = createProject({ sampleRate: 1000, fps: { num: 10, den: 1 } });
+    const child = {
+      ...project.scenes[0],
+      id: 'child',
+      name: 'child',
+      objects: [createObject('audio', 1, 0, 10, { assetId: 'a' })],
+    };
+    project.scenes.push(child);
+    const sceneObj = createObject('scene', 1, 10, 10, {
+      params: { sceneRef: 'child', volume: 50 },
+    });
+    project.scenes[0].objects = [sceneObj];
+    const keys: string[] = [];
+    const sources: MixSources = {
+      reader: (_o, key) => {
+        keys.push(key);
+        return new ConstReader();
+      },
+      assetDuration: () => 10,
+    };
+    const [l] = await mixScene(project, project.scenes[0], 0, 3000, sources);
+    expect(l[500]).toBe(0);
+    expect(l[1500]).toBeCloseTo(0.5, 3);
+    expect(l[2500]).toBe(0);
+    // 入れ子の中のオブジェクトは、親のオブジェクト ID を前につけた識別子で読む
+    expect(keys[0]).toBe(`${sceneObj.id}/${child.objects[0].id}`);
+  });
+
+  it('自分自身を含むシーンは鳴らさない（循環参照）', async () => {
+    const project = createProject({ sampleRate: 1000, fps: { num: 10, den: 1 } });
+    const root = project.scenes[0];
+    root.objects = [createObject('scene', 1, 0, 10, { params: { sceneRef: root.id } })];
+    const sources: MixSources = { reader: () => new ConstReader(), assetDuration: () => 10 };
+    const [l] = await mixScene(project, root, 0, 500, sources);
+    expect(Math.max(...l)).toBe(0);
+  });
+});

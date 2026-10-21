@@ -48,13 +48,25 @@ export interface SelectParamDef extends ParamDefBase {
   options: { value: string; label: string }[];
 }
 
+/** 同じプロジェクト内のシーンを選ぶ（値はシーン ID） */
+export interface SceneParamDef extends ParamDefBase {
+  kind: 'scene';
+  default: string;
+}
+
 export interface BoolParamDef extends ParamDefBase {
   kind: 'boolean';
   default: boolean;
 }
 
 export type ParamDef =
-  NumberParamDef | ColorParamDef | TextParamDef | FontParamDef | SelectParamDef | BoolParamDef;
+  | NumberParamDef
+  | ColorParamDef
+  | TextParamDef
+  | FontParamDef
+  | SelectParamDef
+  | SceneParamDef
+  | BoolParamDef;
 
 export type ResolvedValue = number | string | boolean;
 

@@ -1,4 +1,3 @@
-import { evaluateFrame } from '../../core/evaluate/evaluate';
 import type { Project, Scene } from '../../core/model/types';
 import { Compositor, type MediaProvider } from '../compose';
 import { assetRegistry } from '../media/registry';
@@ -14,6 +13,8 @@ export class OfflineRenderer {
   private compositor = new Compositor();
   private frames = new ExactFramePool((id) => assetRegistry.getMedia(id));
   private media: MediaProvider;
+  /** 描画の前に、必要な動画フレームを集めるときの記録先 */
+  private requests: { key: string; assetId: string; time: number }[] | null = null;
 
   constructor(
     private project: Project,
@@ -27,33 +28,28 @@ export class OfflineRenderer {
     const durations = new Map(project.assets.map((a) => [a.id, a.durationSec]));
     this.media = {
       getImage: (id) => assetRegistry.getImage(id),
-      getVideoFrame: (objectId) => this.frames.get(objectId),
+      getVideoFrame: (key, assetId, time) => {
+        this.requests?.push({ key, assetId, time });
+        return this.frames.get(key);
+      },
       assetDuration: (id) => durations.get(id),
     };
   }
 
   async init(): Promise<void> {
-    await this.compositor.loadFonts(this.scene);
+    await this.compositor.loadFonts(this.project);
   }
 
   async render(frame: number): Promise<void> {
     const { project, scene } = this;
-    const items = evaluateFrame(scene, frame, {
-      fps: project.settings.fps,
-      assetDuration: (id) => this.media.assetDuration(id),
-    });
-    for (const item of items) {
-      if (item.object.type === 'video' && item.object.assetId && item.sourceTime !== undefined) {
-        await this.frames.prepare(item.object.id, item.object.assetId, item.sourceTime);
-      }
-    }
-    const composed = this.compositor.compose(
-      project,
-      scene,
-      frame,
-      this.media,
-      this.width / scene.width,
-    );
+    const scale = this.width / scene.width;
+    // 1 回目は必要な動画フレームを集めるだけ（入れ子のシーンの中も含む）
+    this.requests = [];
+    this.compositor.compose(project, scene, frame, this.media, scale);
+    const requests = this.requests;
+    this.requests = null;
+    for (const r of requests) await this.frames.prepare(r.key, r.assetId, r.time);
+    const composed = this.compositor.compose(project, scene, frame, this.media, scale);
     this.renderer.render(composed.ops, project.settings.backgroundColor);
     this.renderer.pruneTextures(composed.textureKeys);
   }

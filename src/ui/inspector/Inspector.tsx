@@ -9,6 +9,7 @@ import {
   toggleKeyAtPlayhead,
 } from '../../app/animationActions';
 import { addEffect, moveEffect, removeEffect, setEffectEnabled } from '../../app/effectActions';
+import { referableScenes } from '../../app/sceneActions';
 import { EASE_OPTIONS } from '../../core/animation/ease';
 import { isAnimated, valueAt } from '../../core/animation/interpolate';
 import { easeAt, hasKeyAt, objectKeyTimes } from '../../core/animation/keys';
@@ -16,11 +17,19 @@ import { EFFECT_CATEGORIES, EFFECTS, getEffectDef } from '../../core/effects/def
 import { resolveParams } from '../../core/evaluate/evaluate';
 import { formatTimecode, fpsValue } from '../../core/model/time';
 import type { Ease, EffectInstance, ParamMap, TimelineObject } from '../../core/model/types';
-import { getObjectDef } from '../../core/objects/definitions';
-import type { NumberParamDef, ParamDef } from '../../core/params/defs';
+import { COLLAPSED_GROUPS, getObjectDef } from '../../core/objects/definitions';
+import type { NumberParamDef, ParamDef, SceneParamDef } from '../../core/params/defs';
 import { currentScene, useEditor } from '../../state/store';
 import { EaseEditor } from './EaseEditor';
-import { BoolField, ColorField, FontField, NumberField, SelectField, TextField } from './fields';
+import {
+  BoolField,
+  ColorField,
+  FontField,
+  NumberField,
+  SceneField,
+  SelectField,
+  TextField,
+} from './fields';
 
 /** 編集対象のパラメータ（オブジェクト自身か、そのエフェクトか） */
 interface Target {
@@ -159,7 +168,31 @@ function ParamField({
       return <SelectField def={def} value={String(value)} onChange={change} disabled={disabled} />;
     case 'boolean':
       return <BoolField def={def} value={value === true} onChange={change} disabled={disabled} />;
+    case 'scene':
+      return (
+        <SceneParamField def={def} value={String(value)} onChange={change} disabled={disabled} />
+      );
   }
+}
+
+/** 表示するシーンを選ぶ（循環するシーンは選べない） */
+function SceneParamField({
+  def,
+  value,
+  onChange,
+  disabled,
+}: {
+  def: SceneParamDef;
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+}) {
+  const project = useEditor((s) => s.project);
+  const sceneId = useEditor((s) => s.sceneId);
+  const options = referableScenes(project, sceneId);
+  return (
+    <SceneField def={def} value={value} onChange={onChange} disabled={disabled} options={options} />
+  );
 }
 
 function groupParams(params: ParamDef[]): [string, ParamDef[]][] {
@@ -338,7 +371,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
         )}
       </div>
       {locked && <p className="hint">レイヤーがロックされているため編集できません。</p>}
-      {!locked && def.visual && (
+      {!locked && def.params.some((p) => p.kind === 'number' && p.animatable) && (
         <div className="midpoint-row">
           <button
             type="button"
@@ -393,7 +426,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
         const visible = params.filter((p) => !p.visibleIf || p.visibleIf(values));
         if (visible.length === 0) return null;
         return (
-          <details key={group} open className="param-group">
+          <details key={group} open={!COLLAPSED_GROUPS.includes(group)} className="param-group">
             <summary>{group}</summary>
             {visible.map((p) => (
               <ParamField
@@ -407,7 +440,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
           </details>
         );
       })}
-      {def.visual && <EffectsSection obj={obj} local={local} disabled={locked} />}
+      {def.effects && <EffectsSection obj={obj} local={local} disabled={locked} />}
     </div>
   );
 }

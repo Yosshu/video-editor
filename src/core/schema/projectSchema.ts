@@ -41,7 +41,21 @@ const effectSchema = z
 const objectSchema = z
   .object({
     id: z.string().max(128),
-    type: z.enum(['video', 'image', 'audio', 'text', 'shape', 'solid', 'filter']),
+    type: z.enum([
+      'video',
+      'image',
+      'audio',
+      'text',
+      'shape',
+      'solid',
+      'filter',
+      'scene',
+      'framebuffer',
+      'group',
+      'timeControl',
+      'partialFilter',
+      'camera',
+    ]),
     layer: z.number().int().min(1).max(10_000),
     start: z.number().int().min(0),
     length: z.number().int().min(1),

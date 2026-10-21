@@ -89,7 +89,20 @@ export interface EffectInstance {
   params: ParamMap;
 }
 
-export type ObjectType = 'video' | 'image' | 'audio' | 'text' | 'shape' | 'solid' | 'filter';
+export type ObjectType =
+  | 'video'
+  | 'image'
+  | 'audio'
+  | 'text'
+  | 'shape'
+  | 'solid'
+  | 'filter'
+  | 'scene'
+  | 'framebuffer'
+  | 'group'
+  | 'timeControl'
+  | 'partialFilter'
+  | 'camera';
 
 /** タイムライン上のオブジェクト */
 export interface TimelineObject {

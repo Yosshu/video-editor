@@ -152,6 +152,8 @@ export interface VisualItem {
   opacity: number;
   /** 動画の場合、表示する素材内の時刻（秒） */
   sourceTime?: number;
+  /** シーンオブジェクトの場合、表示するシーンのフレーム */
+  sceneFrame?: number;
   /** 有効なエフェクト（上から順に適用） */
   effects: ResolvedEffect[];
   /** 登場・退場による動き */
@@ -162,36 +164,69 @@ export interface EvaluateContext {
   fps: Rational;
   /** 素材の長さ（秒）。ループ計算に使う */
   assetDuration?: (assetId: string) => number | undefined;
+  /** シーンの長さ（フレーム）。シーンオブジェクトのループ計算に使う */
+  sceneLength?: (sceneId: string) => number;
   /** 非表示レイヤー */
   hiddenLayers?: ReadonlySet<number>;
+}
+
+const NO_MOTION: Motion = { dx: 0, dy: 0, scale: 1, opacity: 1 };
+
+/** 制御オブジェクトの対象レイヤーか（range = 0 なら下のすべて） */
+export function inRange(control: { layer: number; range: number }, layer: number): boolean {
+  return layer > control.layer && (control.range <= 0 || layer <= control.layer + control.range);
+}
+
+/** 時間制御：対象のレイヤーで、実際に表示する時刻（フレーム）に置き換える */
+export function remapTime(control: TimelineObject, frame: number): number {
+  const local = Math.min(Math.max(0, frame - control.start), control.length - 1);
+  const p = resolveParams(control, local);
+  if (p.freeze === true) return control.start;
+  const t = p.reverse === true ? control.length - 1 - local : local;
+  return control.start + Math.floor((t * Number(p.speed)) / 100);
 }
 
 /** 指定フレームで描画するオブジェクトを、描画順（レイヤー番号の小さい順）に並べて返す */
 export function evaluateFrame(scene: Scene, frame: number, ctx: EvaluateContext): VisualItem[] {
   const hidden =
     ctx.hiddenLayers ?? new Set(scene.layers.filter((l) => l.hidden).map((l) => l.index));
+  const isActive = (o: TimelineObject, f: number) => f >= o.start && f < o.start + o.length;
+
+  // 時間制御（レイヤー番号の小さい順に重ねて適用する）
+  const timeControls = scene.objects
+    .filter((o) => o.type === 'timeControl' && !hidden.has(o.layer) && isActive(o, frame))
+    .sort((a, b) => a.layer - b.layer)
+    .map((o) => ({
+      object: o,
+      layer: o.layer,
+      range: Number(resolveParams(o, frame - o.start).range),
+    }));
+  const frameCache = new Map<number, number>();
+  const frameFor = (layer: number): number => {
+    let f = frameCache.get(layer);
+    if (f !== undefined) return f;
+    f = frame;
+    for (const tc of timeControls) if (inRange(tc, layer)) f = remapTime(tc.object, f);
+    frameCache.set(layer, f);
+    return f;
+  };
+
   const items: VisualItem[] = [];
-  const active = scene.objects
-    .filter((o) => frame >= o.start && frame < o.start + o.length && !hidden.has(o.layer))
+  const candidates = scene.objects
+    .filter((o) => !hidden.has(o.layer) && o.type !== 'timeControl')
     .sort((a, b) => a.layer - b.layer);
-  for (const object of active) {
+  for (const object of candidates) {
     const def = getObjectDef(object.type);
     if (!def.visual) continue;
-    const localFrame = frame - object.start;
+    const f = frameFor(object.layer);
+    if (!isActive(object, f)) continue;
+    const localFrame = f - object.start;
     const params = resolveParams(object, localFrame);
     const effects = resolveEffects(object.effects, localFrame);
     const localSeconds = framesToSeconds(localFrame, ctx.fps);
     const duration = framesToSeconds(object.length, ctx.fps);
-    if (object.type === 'filter') {
-      items.push({
-        object,
-        def,
-        localFrame,
-        params,
-        opacity: 1,
-        effects,
-        motion: { dx: 0, dy: 0, scale: 1, opacity: 1 },
-      });
+    if (def.control) {
+      items.push({ object, def, localFrame, params, opacity: 1, effects, motion: NO_MOTION });
       continue;
     }
     const fade = fadeFactor(localSeconds, duration, Number(params.fadeIn), Number(params.fadeOut));
@@ -211,6 +246,12 @@ export function evaluateFrame(scene: Scene, frame: number, ctx: EvaluateContext)
     if (object.type === 'video') {
       const assetDuration = object.assetId ? ctx.assetDuration?.(object.assetId) : undefined;
       item.sourceTime = sourceTimeAt(params, localSeconds, assetDuration);
+    }
+    if (object.type === 'scene') {
+      const sceneId = String(params.sceneRef);
+      const length = ctx.sceneLength?.(sceneId) ?? 0;
+      const seconds = sourceTimeAt(params, localSeconds, framesToSeconds(length, ctx.fps));
+      item.sceneFrame = Math.floor(seconds * (ctx.fps.num / ctx.fps.den) + 1e-6);
     }
     items.push(item);
   }

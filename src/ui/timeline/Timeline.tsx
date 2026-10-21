@@ -13,6 +13,8 @@ import {
   updateLayer,
 } from '../../app/actions';
 import { moveMidpointOf } from '../../app/animationActions';
+import { referableScenes } from '../../app/sceneActions';
+import { sceneObjectLength } from '../../engine/compose';
 import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
 import { objectKeyTimes } from '../../core/animation/keys';
 import { openProjectFile } from '../../app/projectFile';
@@ -36,6 +38,7 @@ import { currentScene, getState, setPlayhead, setSelection, useEditor } from '..
 import { openContextMenu, useUi } from '../../state/ui';
 import { usePeaks, useThumbnail } from '../common/mediaHooks';
 import { ASSET_DRAG_TYPE } from '../media-bin/MediaBin';
+import { SceneTabs } from './SceneTabs';
 import { Waveform } from './Waveform';
 import {
   chooseTickInterval,
@@ -59,7 +62,11 @@ interface Viewport {
   height: number;
 }
 
-function objectLabel(obj: TimelineObject, assets: Asset[]): string {
+function objectLabel(obj: TimelineObject, assets: Asset[], scenes: Scene[]): string {
+  if (obj.type === 'scene') {
+    const name = scenes.find((s) => s.id === obj.params.sceneRef)?.name;
+    return name ? `シーン：${name}` : 'シーン（未選択）';
+  }
   if (obj.type === 'filter') {
     const names = obj.effects.map((e) => getEffectDef(e.type)?.label ?? e.type);
     return names.length > 0 ? `フィルタ：${names.join('・')}` : 'フィルタ';
@@ -273,6 +280,7 @@ function PlayheadLine({ ppf, height }: { ppf: number; height: number }) {
 export function Timeline() {
   const scene = useEditor((s) => currentScene(s));
   const assets = useEditor((s) => s.project.assets);
+  const projectScenes = useEditor((s) => s.project.scenes);
   const fps = useEditor((s) => s.project.settings.fps);
   const selection = useEditor((s) => s.selection);
   const ppf = useEditor((s) => s.pxPerFrame);
@@ -588,11 +596,28 @@ export function Timeline() {
       return;
     }
     const add = (type: ObjectType) => () => addObject(type, layer, frame);
+    const state = getState();
+    const otherScenes = referableScenes(state.project, state.sceneId);
     openContextMenu(e.clientX, e.clientY, [
       { label: 'テキストを追加', action: add('text') },
       { label: '図形を追加', action: add('shape') },
       { label: '単色を追加', action: add('solid') },
+      {
+        label: 'シーンを追加（別のシーンを素材にする）',
+        disabled: otherScenes.length === 0,
+        action: () =>
+          addObject('scene', layer, frame, {
+            params: { sceneRef: otherScenes[0].id },
+            length: sceneObjectLength(state.project, otherScenes[0].id),
+          }),
+      },
+      { label: 'フレームバッファを追加（上までの画面を素材にする）', action: add('framebuffer') },
+      'separator',
       { label: 'フィルタを追加（上のレイヤー全体にエフェクト）', action: add('filter') },
+      { label: '部分フィルタを追加（範囲の中だけエフェクト）', action: add('partialFilter') },
+      { label: 'グループ制御を追加（下のレイヤーをまとめて動かす）', action: add('group') },
+      { label: '時間制御を追加（下のレイヤーの時間を変える）', action: add('timeControl') },
+      { label: 'カメラ制御を追加（下のレイヤーを 3D で撮影）', action: add('camera') },
       {
         label: '動画・画像・音声ファイルを追加…',
         action: async () => {
@@ -671,6 +696,7 @@ export function Timeline() {
     <section className="panel timeline" aria-label="タイムライン">
       <div className="timeline-toolbar">
         <h2>タイムライン</h2>
+        <SceneTabs />
         <label className="toolbar-item" title="Ctrl + ホイールでも拡大縮小できます">
           拡大
           <input
@@ -738,7 +764,7 @@ export function Timeline() {
               <ObjectItem
                 key={o.id}
                 obj={o}
-                label={objectLabel(o, assets)}
+                label={objectLabel(o, assets, projectScenes)}
                 selected={selectedSet.has(o.id)}
                 locked={lockedLayers.has(o.layer)}
                 ppf={ppf}

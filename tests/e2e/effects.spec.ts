@@ -68,6 +68,7 @@ test('合成モード（差分）', async ({ page }) => {
 
 test('登場の演出（ワイプ）', async ({ page }) => {
   await addAt(page, '図形を追加', 1);
+  await page.getByText('登場・退場', { exact: true }).click();
   await page.getByLabel('登場', { exact: true }).selectOption('wipeLeft');
   await spin(page, '登場の時間').fill('1');
   // 0.5 秒時点：左半分だけ見える

@@ -1173,3 +1173,31 @@ kbd {
   width: 100%;
   margin-top: 8px;
 }
+
+/* ---------- シーン ---------- */
+
+.scene-tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  max-width: 45%;
+}
+
+.scene-tab {
+  padding: 2px 10px;
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+  background: var(--bg);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.scene-tab.active {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.scene-tab.add {
+  padding: 2px 8px;
+}

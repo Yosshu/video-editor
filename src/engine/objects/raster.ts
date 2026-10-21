@@ -39,7 +39,12 @@ function createCanvas(width: number, height: number): OffscreenCanvas {
 }
 
 /** テキストを描画する。中心は文字のまとまりの中心 */
-export function rasterizeText(p: ResolvedParams, scale: number): Raster {
+export function rasterizeText(
+  p: ResolvedParams,
+  scale: number,
+  /** 先頭から何文字まで表示するか（1 文字ずつ表示。配置は全文で決める） */
+  visibleChars = Infinity,
+): Raster {
   const lines = String(p.text).split(/\r?\n/);
   const size = Number(p.size) * scale;
   const lineHeight = size * (Number(p.lineHeight) / 100);
@@ -76,8 +81,18 @@ export function rasterizeText(p: ResolvedParams, scale: number): Raster {
     return pad + (blockWidth - w) / 2;
   };
 
+  // 表示する文字数を行ごとに割り振る
+  let remaining = visibleChars;
+  const visibleLines = lines.map((line) => {
+    const chars = Array.from(line);
+    const shown = chars.slice(0, Math.max(0, remaining)).join('');
+    remaining -= chars.length;
+    return shown;
+  });
   const drawPass = (fn: (line: string, x: number, y: number) => void) => {
-    lines.forEach((line, i) => fn(line, xFor(widths[i]), pad + lineHeight * (i + 0.5)));
+    visibleLines.forEach((line, i) => {
+      if (line) fn(line, xFor(widths[i]), pad + lineHeight * (i + 0.5));
+    });
   };
 
   if (shadow) {

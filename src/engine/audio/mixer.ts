@@ -3,13 +3,20 @@ import { fadeFactor } from '../../core/evaluate/evaluate';
 import { framesToSeconds, secondsToFrames } from '../../core/model/time';
 import type { Project, Scene, TimelineObject } from '../../core/model/types';
 import { getObjectDef } from '../../core/objects/definitions';
+import { sceneDuration } from '../../core/timeline/ops';
 import type { PcmReader } from './reader';
 
 export interface MixSources {
-  /** オブジェクトの音声を読む（音声がなければ null） */
-  reader(object: TimelineObject): PcmReader | null;
+  /**
+   * オブジェクトの音声を読む（音声がなければ null）。
+   * instanceKey はオブジェクトの識別子（入れ子のシーンでは親のオブジェクト ID を前につける）
+   */
+  reader(object: TimelineObject, instanceKey: string): PcmReader | null;
   assetDuration(assetId: string): number | undefined;
 }
+
+/** 入れ子のシーンの深さの上限 */
+const MAX_DEPTH = 8;
 
 export type StereoPcm = [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>];
 
@@ -18,8 +25,27 @@ const BLOCK = 128;
 
 function hasAudio(obj: TimelineObject): boolean {
   if (!getObjectDef(obj.type).audio) return false;
-  if (obj.type === 'video' && obj.params.mute === true) return false;
+  if ((obj.type === 'video' || obj.type === 'scene') && obj.params.mute === true) return false;
   return true;
+}
+
+/** シーンオブジェクトの音声：表示するシーンをミックスしたものを素材として読む */
+function sceneReader(
+  project: Project,
+  nested: Scene,
+  sources: MixSources,
+  prefix: string,
+  path: string[],
+): PcmReader {
+  const sr = project.settings.sampleRate;
+  return {
+    read: async (start, end) => {
+      const n = Math.max(0, Math.round((end - start) * sr));
+      const [l, r] = await mixScene(project, nested, start, n, sources, prefix, path);
+      return { start, sampleRate: sr, channels: [l, r] };
+    },
+    dispose: () => undefined,
+  };
 }
 
 /** 左右バランス（-100〜100）から左右の倍率 */
@@ -38,6 +64,8 @@ export async function mixScene(
   startSec: number,
   numSamples: number,
   sources: MixSources,
+  prefix = '',
+  path: string[] = [scene.id],
 ): Promise<StereoPcm> {
   const sr = project.settings.sampleRate;
   const fps = project.settings.fps;
@@ -53,7 +81,18 @@ export async function mixScene(
     const ov0 = Math.max(t0, objStart);
     const ov1 = Math.min(t1, objEnd);
     if (ov1 <= ov0) return;
-    const reader = sources.reader(obj);
+    let reader: PcmReader | null;
+    let sourceDuration: number | undefined;
+    if (obj.type === 'scene') {
+      const nestedId = String(obj.params.sceneRef ?? '');
+      const nested = project.scenes.find((x) => x.id === nestedId);
+      if (!nested || path.includes(nestedId) || path.length >= MAX_DEPTH) return;
+      reader = sceneReader(project, nested, sources, `${prefix}${obj.id}/`, [...path, nestedId]);
+      sourceDuration = framesToSeconds(sceneDuration(nested), fps);
+    } else {
+      reader = sources.reader(obj, prefix + obj.id);
+      sourceDuration = obj.assetId ? sources.assetDuration(obj.assetId) : undefined;
+    }
     if (!reader) return;
 
     const i0 = Math.max(0, Math.ceil((ov0 - t0) * sr - 1e-9));
@@ -63,7 +102,7 @@ export async function mixScene(
     const speed = (typeof p.speed === 'number' ? p.speed : 100) / 100;
     const offset = typeof p.offset === 'number' ? p.offset : 0;
     const loop = p.loop === true;
-    const duration = obj.assetId ? sources.assetDuration(obj.assetId) : undefined;
+    const duration = sourceDuration;
     const fadeIn = typeof p.fadeIn === 'number' ? p.fadeIn : 0;
     const fadeOut = typeof p.fadeOut === 'number' ? p.fadeOut : 0;
     const objDuration = objEnd - objStart;

@@ -46,7 +46,10 @@ function formatSeconds(ms: number): string {
 
 export function ExportDialog() {
   const settings = useEditor((s) => s.project.settings);
-  const scene = useEditor((s) => currentScene(s));
+  // 書き出すのはメインのシーン
+  const scene = useEditor(
+    (s) => s.project.scenes.find((x) => x.id === s.project.rootSceneId) ?? currentScene(s),
+  );
   const duration = sceneDuration(scene);
   const [support, setSupport] = useState<CodecSupport | null>(null);
   const [format, setFormat] = useState<ContainerFormat>('mp4');

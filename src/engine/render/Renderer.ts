@@ -4,36 +4,54 @@ import { EFFECT_IMPLS, EffectRunner, WIPE_KINDS, type Surface } from '../effects
 import {
   createProgram,
   createRenderTarget,
+  DEFAULT_FOCAL,
   deleteRenderTarget,
-  mat3Multiply,
-  mat3Rotate,
-  mat3Scale,
-  mat3Translate,
+  mat4LookAt,
+  mat4Multiply,
+  mat4Perspective,
+  mat4RotateX,
+  mat4RotateY,
+  mat4RotateZ,
+  mat4Scale,
+  mat4Translate,
   parseColor,
   type Mat3,
+  type Mat4,
   type Program,
   type RenderTarget,
+  type Vec3,
 } from './gl';
 import { RenderTargetPool } from './targetPool';
+
+/** カメラ（カメラ制御） */
+export interface CameraView {
+  eye: Vec3;
+  target: Vec3;
+  focal: number;
+}
 
 /** 1 つのオブジェクトの描画指示 */
 export interface DrawItem {
   /** テクスチャを使い回すためのキー（オブジェクト ID など） */
   key: string;
-  source: TexImageSource;
+  /** 素材の画像。nested・framebuffer のときは使わない */
+  source?: TexImageSource;
   /** 変わったときだけテクスチャを再転送する */
-  version: unknown;
+  version?: unknown;
   /** 静止素材はミップマップを作って縮小時の画質を上げる */
-  mipmap: boolean;
+  mipmap?: boolean;
   /** シーン座標での大きさ（拡大率をかける前） */
   width: number;
   height: number;
   x: number;
   y: number;
+  z?: number;
   scaleX: number;
   scaleY: number;
-  /** 度、時計回り */
+  /** 度、時計回り（Z 軸回転） */
   rotation: number;
+  rotX?: number;
+  rotY?: number;
   /** 0〜1 */
   opacity: number;
   blend: BlendMode;
@@ -45,23 +63,39 @@ export interface DrawItem {
   effectScale?: number;
   /** 登場・退場のワイプ */
   wipe?: { kind: string; progress: number };
+  /** カメラ制御の対象なら、そのカメラ */
+  camera?: CameraView;
+  /** シーンオブジェクト：別のシーンを描いて素材にする */
+  nested?: { ops: RenderOp[]; sceneWidth: number; sceneHeight: number };
+  /** フレームバッファ：それまでに描いた画面を素材にする */
+  framebuffer?: { clear: boolean; background: string };
+}
+
+/** 部分フィルタの範囲（シーン座標） */
+export interface Region {
+  shape: 'rectangle' | 'ellipse';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  feather: number;
+  invert: boolean;
 }
 
 /** 描画の手順 */
 export type RenderOp =
   /** オブジェクトを描く。mask があれば、その形で切り抜く（上のオブジェクトでクリッピング） */
   | { kind: 'draw'; item: DrawItem; mask?: DrawItem }
-  /** それまでに描いた画面全体にエフェクトをかける（フィルタオブジェクト） */
-  | { kind: 'filter'; effects: ResolvedEffect[] };
+  /** それまでに描いた画面全体（region があればその範囲）にエフェクトをかける */
+  | { kind: 'filter'; effects: ResolvedEffect[]; region?: Region };
 
 const QUAD_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
-uniform mat3 uMatrix;
+uniform mat4 uMatrix;
 uniform mat3 uUvMatrix;
 out vec2 vUv;
 void main() {
-  vec3 p = uMatrix * vec3(aPos, 1.0);
-  gl_Position = vec4(p.xy, 0.0, 1.0);
+  gl_Position = uMatrix * vec4(aPos, 0.0, 1.0);
   vUv = (uUvMatrix * vec3(aPos + 0.5, 1.0)).xy;
 }`;
 
@@ -130,6 +164,10 @@ void main() {
 }`;
 
 const IDENTITY: Mat3 = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+/** 全面に描くための変換（-0.5〜0.5 の四角形をクリップ座標全体へ） */
+const FULLSCREEN: Mat4 = mat4Scale(2, 2, 1);
+/** 入れ子の深さの上限（シーンの循環参照への備え） */
+const MAX_DEPTH = 8;
 
 const ADVANCED_BLEND: Record<string, number> = {
   overlay: 1,
@@ -153,6 +191,21 @@ interface Prepared {
   height: number;
   uvMatrix: Mat3;
   release: () => void;
+}
+
+/** 1 つのシーンを描くときの描画先 */
+interface Ctx {
+  target: RenderTarget;
+  sceneW: number;
+  sceneH: number;
+  /** シーン 1px あたりのピクセル数 */
+  res: number;
+  background: [number, number, number, number];
+  copy: RenderTarget | null;
+  mask: RenderTarget | null;
+  /** copy・mask を使い終わったら返すか（入れ子のシーン） */
+  pooled: boolean;
+  depth: number;
 }
 
 export class Renderer {
@@ -240,8 +293,9 @@ export class Renderer {
       this.canvas.height = h;
     }
     if (!this.sceneTarget || this.sceneTarget.width !== w || this.sceneTarget.height !== h) {
-      for (const t of [this.sceneTarget, this.sceneCopy, this.maskTarget])
+      for (const t of [this.sceneTarget, this.sceneCopy, this.maskTarget]) {
         if (t) deleteRenderTarget(this.gl, t);
+      }
       this.sceneTarget = createRenderTarget(this.gl, w, h);
       this.sceneCopy = createRenderTarget(this.gl, w, h);
       this.maskTarget = createRenderTarget(this.gl, w, h);
@@ -273,7 +327,7 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, cached.texture);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, item.source);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, item.source!);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -287,45 +341,117 @@ export class Renderer {
     return cached;
   }
 
-  /**
-   * オブジェクトのテクスチャを用意する。エフェクトがあれば、オブジェクト専用の描画先で順に適用する。
-   */
-  private prepare(item: DrawItem): Prepared {
-    const cached = this.uploadTexture(item);
-    const effects = (item.effects ?? []).filter((e) => EFFECT_IMPLS[e.type]);
-    if (effects.length === 0 && !item.wipe) {
-      return {
-        texture: cached.texture,
-        width: item.width,
-        height: item.height,
-        uvMatrix: item.uvMatrix ?? IDENTITY,
-        release: () => undefined,
-      };
-    }
+  private blit(from: RenderTarget, to: RenderTarget): void {
     const gl = this.gl;
-    const res = item.effectScale ?? this.pixelScale;
-    // 素材をそのままの向きでオブジェクト用の描画先に写す
-    const base = this.pool.acquire(item.width * res, item.height * res);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, base.framebuffer);
-    gl.viewport(0, 0, base.width, base.height);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, from.framebuffer);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, to.framebuffer);
+    gl.blitFramebuffer(
+      0,
+      0,
+      from.width,
+      from.height,
+      0,
+      0,
+      to.width,
+      to.height,
+      gl.COLOR_BUFFER_BIT,
+      gl.LINEAR,
+    );
+  }
+
+  private clear(target: RenderTarget, color: [number, number, number, number]): void {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+    gl.viewport(0, 0, target.width, target.height);
     gl.disable(gl.BLEND);
-    gl.clearColor(0, 0, 0, 0);
+    gl.clearColor(...color);
     gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+
+  /** 合成シェーダーの補助テクスチャ（合成先のコピー・マスク）を設定する */
+  private bindAux(dst: WebGLTexture | null, mask: WebGLTexture | null): void {
+    const gl = this.gl;
     const prog = this.quadProgram;
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, dst);
+    gl.uniform1i(prog.uniforms.uDst, 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, mask);
+    gl.uniform1i(prog.uniforms.uMask, 2);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+
+  /** テクスチャをそのままの向きで描画先全体に写す */
+  private drawFull(texture: WebGLTexture, uvMatrix: Mat3, target: RenderTarget): void {
+    const gl = this.gl;
+    const prog = this.quadProgram;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+    gl.viewport(0, 0, target.width, target.height);
+    gl.disable(gl.BLEND);
     gl.useProgram(prog.program);
     gl.bindVertexArray(this.vao);
     this.bindAux(null, null);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, cached.texture);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(prog.uniforms.uTex, 0);
-    gl.uniformMatrix3fv(prog.uniforms.uMatrix, false, mat3Scale(2, 2));
-    gl.uniformMatrix3fv(prog.uniforms.uUvMatrix, false, item.uvMatrix ?? IDENTITY);
+    gl.uniformMatrix4fv(prog.uniforms.uMatrix, false, FULLSCREEN);
+    gl.uniformMatrix3fv(prog.uniforms.uUvMatrix, false, uvMatrix);
     gl.uniform1f(prog.uniforms.uOpacity, 1);
     gl.uniform1i(prog.uniforms.uMode, 0);
     gl.uniform1i(prog.uniforms.uUseMask, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
 
-    let surface: Surface = { target: base, width: item.width, height: item.height };
+  /**
+   * オブジェクトのテクスチャを用意する。エフェクトがあれば、オブジェクト専用の描画先で順に適用する。
+   */
+  private prepare(ctx: Ctx, item: DrawItem): Prepared | null {
+    const effects = (item.effects ?? []).filter((e) => EFFECT_IMPLS[e.type]);
+    let res = item.effectScale ?? ctx.res;
+    let surface: Surface;
+
+    if (item.nested) {
+      if (ctx.depth >= MAX_DEPTH) return null;
+      const { sceneWidth, sceneHeight, ops } = item.nested;
+      const target = this.pool.acquire(sceneWidth * res, sceneHeight * res);
+      this.renderInto(
+        {
+          target,
+          sceneW: sceneWidth,
+          sceneH: sceneHeight,
+          res,
+          background: [0, 0, 0, 0],
+          copy: null,
+          mask: null,
+          pooled: true,
+          depth: ctx.depth + 1,
+        },
+        ops,
+      );
+      surface = { target, width: sceneWidth, height: sceneHeight };
+    } else if (item.framebuffer) {
+      const target = this.pool.acquire(ctx.target.width, ctx.target.height);
+      this.blit(ctx.target, target);
+      if (item.framebuffer.clear) this.clear(ctx.target, ctx.background);
+      res = ctx.res;
+      surface = { target, width: ctx.sceneW, height: ctx.sceneH };
+    } else {
+      const cached = this.uploadTexture(item);
+      if (effects.length === 0 && !item.wipe) {
+        return {
+          texture: cached.texture,
+          width: item.width,
+          height: item.height,
+          uvMatrix: item.uvMatrix ?? IDENTITY,
+          release: () => undefined,
+        };
+      }
+      // 素材をそのままの向きでオブジェクト用の描画先に写す
+      const base = this.pool.acquire(item.width * res, item.height * res);
+      this.drawFull(cached.texture, item.uvMatrix ?? IDENTITY, base);
+      surface = { target: base, width: item.width, height: item.height };
+    }
+
     const apply = (type: string, params: Record<string, number | string | boolean>) => {
       const next = EFFECT_IMPLS[type](this.effects, surface, params, res, true);
       if (next.target !== surface.target) this.pool.release(surface.target);
@@ -380,26 +506,37 @@ export class Renderer {
     }
   }
 
-  /** シーン座標（中央原点・下向き +Y）から、描画先（0 行目 = 上端）のクリップ座標への変換 */
-  private projection(): Mat3 {
-    return mat3Scale(2 / this.sceneWidth, 2 / this.sceneHeight);
+  /**
+   * オブジェクトの変換：透視投影 × カメラ × 平行移動 × 回転（Z・Y・X）× 大きさ。
+   * Z が 0 で回転が Z 軸だけなら、2D の配置と同じ結果になる。
+   */
+  private modelMatrix(ctx: Ctx, item: DrawItem, prepared: Prepared): Mat4 {
+    const camera = item.camera;
+    const focal = camera?.focal ?? DEFAULT_FOCAL;
+    const view = camera
+      ? mat4LookAt(camera.eye, camera.target)
+      : mat4LookAt([0, 0, -DEFAULT_FOCAL], [0, 0, 0]);
+    let m = mat4Translate(item.x, item.y, item.z ?? 0);
+    m = mat4Multiply(m, mat4RotateZ(item.rotation));
+    if (item.rotY) m = mat4Multiply(m, mat4RotateY(item.rotY));
+    if (item.rotX) m = mat4Multiply(m, mat4RotateX(item.rotX));
+    m = mat4Multiply(m, mat4Scale(prepared.width * item.scaleX, prepared.height * item.scaleY, 1));
+    return mat4Multiply(mat4Perspective(ctx.sceneW, ctx.sceneH, focal), mat4Multiply(view, m));
   }
 
-  private modelMatrix(item: DrawItem, prepared: Prepared): Mat3 {
-    return mat3Multiply(
-      this.projection(),
-      mat3Multiply(
-        mat3Translate(item.x, item.y),
-        mat3Multiply(
-          mat3Rotate(item.rotation),
-          mat3Scale(prepared.width * item.scaleX, prepared.height * item.scaleY),
-        ),
-      ),
-    );
+  private ensureCopy(ctx: Ctx): RenderTarget {
+    if (!ctx.copy) ctx.copy = this.pool.acquire(ctx.target.width, ctx.target.height);
+    return ctx.copy;
+  }
+
+  private ensureMask(ctx: Ctx): RenderTarget {
+    if (!ctx.mask) ctx.mask = this.pool.acquire(ctx.target.width, ctx.target.height);
+    return ctx.mask;
   }
 
   /** 描画先へオブジェクトを 1 つ合成する */
   private composite(
+    ctx: Ctx,
     target: RenderTarget,
     item: DrawItem,
     prepared: Prepared,
@@ -409,37 +546,23 @@ export class Renderer {
     const prog = this.quadProgram;
     const advanced =
       !SIMPLE_BLEND_MODES.includes(item.blend) && ADVANCED_BLEND[item.blend] !== undefined;
+    let dst: RenderTarget | null = null;
     if (advanced) {
       // シェーダーで合成するため、現在の画面をコピーしておく
-      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, target.framebuffer);
-      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.sceneCopy!.framebuffer);
-      gl.blitFramebuffer(
-        0,
-        0,
-        target.width,
-        target.height,
-        0,
-        0,
-        target.width,
-        target.height,
-        gl.COLOR_BUFFER_BIT,
-        gl.NEAREST,
-      );
+      dst = this.ensureCopy(ctx);
+      this.blit(target, dst);
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
     gl.viewport(0, 0, target.width, target.height);
     gl.useProgram(prog.program);
     gl.bindVertexArray(this.vao);
     // 描画先と同じテクスチャを読まないよう、使わないものは外しておく
-    this.bindAux(
-      advanced ? this.sceneCopy!.texture : null,
-      useMask ? this.maskTarget!.texture : null,
-    );
+    this.bindAux(dst?.texture ?? null, useMask ? this.ensureMask(ctx).texture : null);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, prepared.texture);
     gl.uniform1i(prog.uniforms.uTex, 0);
     gl.uniform2f(prog.uniforms.uTargetSize, target.width, target.height);
-    gl.uniformMatrix3fv(prog.uniforms.uMatrix, false, this.modelMatrix(item, prepared));
+    gl.uniformMatrix4fv(prog.uniforms.uMatrix, false, this.modelMatrix(ctx, item, prepared));
     gl.uniformMatrix3fv(prog.uniforms.uUvMatrix, false, prepared.uvMatrix);
     gl.uniform1f(prog.uniforms.uOpacity, item.opacity);
     gl.uniform1i(prog.uniforms.uUseMask, useMask ? 1 : 0);
@@ -453,85 +576,97 @@ export class Renderer {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
-  /** 合成シェーダーの補助テクスチャ（合成先のコピー・マスク）を設定する */
-  private bindAux(dst: WebGLTexture | null, mask: WebGLTexture | null): void {
-    const gl = this.gl;
-    const prog = this.quadProgram;
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, dst);
-    gl.uniform1i(prog.uniforms.uDst, 1);
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, mask);
-    gl.uniform1i(prog.uniforms.uMask, 2);
-    gl.activeTexture(gl.TEXTURE0);
-  }
-
   /** クリッピング用のマスク（上のオブジェクトの形）を描く */
-  private drawMask(mask: DrawItem): void {
-    const gl = this.gl;
-    const target = this.maskTarget!;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    const prepared = this.prepare(mask);
-    this.composite(target, { ...mask, blend: 'normal' }, prepared, false);
+  private drawMask(ctx: Ctx, mask: DrawItem): void {
+    const target = this.ensureMask(ctx);
+    this.clear(target, [0, 0, 0, 0]);
+    const prepared = this.prepare(ctx, mask);
+    if (!prepared) return;
+    // マスク自身に合成モードは使わない（マスクの描画先へは通常の合成で描く）
+    this.composite(ctx, target, { ...mask, blend: 'normal' }, prepared, false);
     prepared.release();
   }
 
-  /** 画面全体にエフェクトをかける（フィルタオブジェクト） */
-  private applyFilter(effects: ResolvedEffect[]): void {
-    const gl = this.gl;
-    const scene = this.sceneTarget!;
-    let surface: Surface = { target: scene, width: this.sceneWidth, height: this.sceneHeight };
+  /** 画面全体（または範囲）にエフェクトをかける（フィルタ・部分フィルタ） */
+  private applyFilter(ctx: Ctx, effects: ResolvedEffect[], region?: Region): void {
+    const scene = ctx.target;
+    let surface: Surface = { target: scene, width: ctx.sceneW, height: ctx.sceneH };
     for (const e of effects) {
       const impl = EFFECT_IMPLS[e.type];
       if (!impl) continue;
-      const next = impl(this.effects, surface, e.params, this.pixelScale, false);
-      if (surface.target !== scene && next.target !== surface.target)
+      const next = impl(this.effects, surface, e.params, ctx.res, false);
+      if (surface.target !== scene && next.target !== surface.target) {
         this.pool.release(surface.target);
+      }
       surface = next;
     }
     if (surface.target === scene) return;
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, surface.target.framebuffer);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, scene.framebuffer);
-    gl.blitFramebuffer(
-      0,
-      0,
-      scene.width,
-      scene.height,
-      0,
-      0,
-      scene.width,
-      scene.height,
-      gl.COLOR_BUFFER_BIT,
-      gl.NEAREST,
-    );
-    this.pool.release(surface.target);
+    let result = surface.target;
+    if (region) {
+      const r = ctx.res;
+      result = this.effects.pass(
+        'regionMix',
+        surface.target,
+        scene.width,
+        scene.height,
+        {
+          uCenter: [region.x * r + scene.width / 2, region.y * r + scene.height / 2],
+          uHalf: [(region.width * r) / 2, (region.height * r) / 2],
+          uFeather: region.feather * r,
+          uEllipse: region.shape === 'ellipse' ? 1 : 0,
+          uInvert: region.invert ? 1 : 0,
+        },
+        [0, 0],
+        { uOrig: scene },
+      );
+      this.pool.release(surface.target);
+    }
+    this.blit(result, scene);
+    this.pool.release(result);
+  }
+
+  /** 描画手順を ctx の描画先に実行する */
+  private renderInto(ctx: Ctx, ops: RenderOp[]): void {
+    this.clear(ctx.target, ctx.background);
+    for (const op of ops) {
+      if (op.kind === 'filter') {
+        if (op.effects.length > 0) this.applyFilter(ctx, op.effects, op.region);
+        continue;
+      }
+      const item = op.item;
+      if (item.opacity <= 0 || item.width <= 0 || item.height <= 0) continue;
+      if (op.mask) this.drawMask(ctx, op.mask);
+      const prepared = this.prepare(ctx, item);
+      if (!prepared) continue;
+      this.composite(ctx, ctx.target, item, prepared, !!op.mask);
+      prepared.release();
+    }
+    if (ctx.pooled) {
+      if (ctx.copy) this.pool.release(ctx.copy);
+      if (ctx.mask) this.pool.release(ctx.mask);
+      ctx.copy = null;
+      ctx.mask = null;
+    }
   }
 
   render(ops: RenderOp[], background: string): void {
     if (this.isContextLost || !this.sceneTarget) return;
     const gl = this.gl;
-    const target = this.sceneTarget;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
-    gl.viewport(0, 0, target.width, target.height);
     const [r, g, b] = parseColor(background);
-    gl.disable(gl.BLEND);
-    gl.clearColor(r, g, b, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    for (const op of ops) {
-      if (op.kind === 'filter') {
-        if (op.effects.length > 0) this.applyFilter(op.effects);
-        continue;
-      }
-      const item = op.item;
-      if (item.opacity <= 0 || item.width <= 0 || item.height <= 0) continue;
-      if (op.mask) this.drawMask(op.mask);
-      const prepared = this.prepare(item);
-      this.composite(target, item, prepared, !!op.mask);
-      prepared.release();
-    }
+    this.renderInto(
+      {
+        target: this.sceneTarget,
+        sceneW: this.sceneWidth,
+        sceneH: this.sceneHeight,
+        res: this.sceneTarget.width / this.sceneWidth,
+        background: [r, g, b, 1],
+        copy: this.sceneCopy,
+        mask: this.maskTarget,
+        pooled: false,
+        depth: 0,
+      },
+      ops,
+    );
 
     // 画面（canvas）へ転送
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -540,7 +675,7 @@ export class Renderer {
     gl.useProgram(this.presentProgram.program);
     gl.bindVertexArray(this.vao);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, target.texture);
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneTarget.texture);
     gl.uniform1i(this.presentProgram.uniforms.uTex, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.bindVertexArray(null);
@@ -560,8 +695,9 @@ export class Renderer {
   dispose(): void {
     for (const cached of this.textures.values()) this.gl.deleteTexture(cached.texture);
     this.textures.clear();
-    for (const t of [this.sceneTarget, this.sceneCopy, this.maskTarget])
+    for (const t of [this.sceneTarget, this.sceneCopy, this.maskTarget]) {
       if (t) deleteRenderTarget(this.gl, t);
+    }
     this.sceneTarget = null;
     this.sceneCopy = null;
     this.maskTarget = null;

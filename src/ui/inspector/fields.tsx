@@ -4,6 +4,7 @@ import type {
   ColorParamDef,
   FontParamDef,
   NumberParamDef,
+  SceneParamDef,
   SelectParamDef,
   TextParamDef,
 } from '../../core/params/defs';
@@ -245,6 +246,33 @@ export function SelectField({
         {def.options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+export function SceneField({
+  def,
+  value,
+  onChange,
+  disabled,
+  options,
+}: FieldProps<SceneParamDef, string> & { options: { id: string; name: string }[] }) {
+  const id = useId();
+  return (
+    <div className="field">
+      <label htmlFor={id} className="field-label">
+        {def.label}
+      </label>
+      <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+        {!options.some((o) => o.id === value) && (
+          <option value={value}>（選択してください）</option>
+        )}
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
           </option>
         ))}
       </select>

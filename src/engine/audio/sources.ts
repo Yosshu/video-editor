@@ -19,11 +19,11 @@ export class AudioReaderPool implements MixSources {
     private getDuration: (assetId: string) => number | undefined,
   ) {}
 
-  reader(object: TimelineObject): PcmReader | null {
+  reader(object: TimelineObject, instanceKey: string): PcmReader | null {
     if (!object.assetId) return null;
     const handle = this.getHandle(object.assetId);
     if (!handle?.audioTrack) return null;
-    let entry = this.readers.get(object.id);
+    let entry = this.readers.get(instanceKey);
     if (entry && entry.handle !== handle) {
       entry.reader.dispose();
       entry = undefined;
@@ -35,7 +35,7 @@ export class AudioReaderPool implements MixSources {
         Math.min(2, handle.audioChannels),
       );
       entry = { reader, handle, lastUsed: 0 };
-      this.readers.set(object.id, entry);
+      this.readers.set(instanceKey, entry);
     }
     entry.lastUsed = performance.now();
     return entry.reader;
