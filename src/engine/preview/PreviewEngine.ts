@@ -2,6 +2,7 @@ import { Compositor, type ComposedItem, type MediaProvider } from '../compose';
 import { Renderer } from '../render/Renderer';
 import { currentScene, getState, useEditor } from '../../state/store';
 import { assetRegistry } from '../media/registry';
+import { onPreviewFrameReady } from './previewMediaInstance';
 
 /**
  * プレビュー画面の描画。状態が変わったら次のアニメーションフレームでまとめて描き直す。
@@ -34,6 +35,7 @@ export class PreviewEngine {
         }
       }),
       assetRegistry.onChange(() => this.requestRender()),
+      onPreviewFrameReady(() => this.requestRender()),
     );
     this.requestRender();
   }

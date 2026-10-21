@@ -14,6 +14,9 @@ export interface MediaSourceHandle {
   input: Input;
   videoTrack: InputVideoTrack | null;
   audioTrack: InputAudioTrack | null;
+  /** 音声のサンプリングレートとチャンネル数（音声がなければ 0） */
+  audioSampleRate: number;
+  audioChannels: number;
   duration: number;
   rotation: 0 | 90 | 180 | 270;
   displayWidth: number;
@@ -43,10 +46,14 @@ export async function openMediaSource(file: Blob): Promise<MediaSourceHandle> {
     const displayWidth = videoTrack ? await videoTrack.getDisplayWidth() : 0;
     const displayHeight = videoTrack ? await videoTrack.getDisplayHeight() : 0;
     if (videoTrack && (displayWidth <= 0 || displayHeight <= 0)) videoTrack = null;
+    const audioSampleRate = audioTrack ? await audioTrack.getSampleRate() : 0;
+    const audioChannels = audioTrack ? await audioTrack.getNumberOfChannels() : 0;
     return {
       input,
       videoTrack,
       audioTrack,
+      audioSampleRate,
+      audioChannels,
       duration,
       rotation,
       displayWidth,

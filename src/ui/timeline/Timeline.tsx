@@ -14,8 +14,8 @@ import {
 } from '../../app/actions';
 import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
 import { openProjectFile } from '../../app/projectFile';
-import { secondsToFrames } from '../../core/model/time';
-import type { Asset, ObjectType, Scene, TimelineObject } from '../../core/model/types';
+import { framesToSeconds, secondsToFrames } from '../../core/model/time';
+import type { Asset, ObjectType, Rational, Scene, TimelineObject } from '../../core/model/types';
 import { getObjectDef } from '../../core/objects/definitions';
 import {
   collectSnapPoints,
@@ -31,7 +31,9 @@ import { pickFilesWithInput } from '../../storage/filePicker';
 import { playback } from '../../engine/playback/Playback';
 import { currentScene, getState, setPlayhead, setSelection, useEditor } from '../../state/store';
 import { openContextMenu, useUi } from '../../state/ui';
+import { usePeaks, useThumbnail } from '../common/mediaHooks';
 import { ASSET_DRAG_TYPE } from '../media-bin/MediaBin';
+import { Waveform } from './Waveform';
 import {
   chooseTickInterval,
   formatRulerLabel,
@@ -76,6 +78,8 @@ const ObjectItem = memo(function ObjectItem({
   selected,
   locked,
   ppf,
+  fps,
+  assetDuration,
   ghost,
 }: {
   obj: TimelineObject;
@@ -83,12 +87,21 @@ const ObjectItem = memo(function ObjectItem({
   selected: boolean;
   locked: boolean;
   ppf: number;
+  fps: Rational;
+  assetDuration: number;
   ghost?: { layer: number; start: number; length: number };
 }) {
   const def = getObjectDef(obj.type);
   const layer = ghost?.layer ?? obj.layer;
   const start = ghost?.start ?? obj.start;
   const length = ghost?.length ?? obj.length;
+  const width = Math.max(2, length * ppf);
+  const thumb = useThumbnail(
+    obj.type === 'video' || obj.type === 'image' ? obj.assetId : undefined,
+  );
+  const showWave =
+    (obj.type === 'audio' || (obj.type === 'video' && obj.params.mute !== true)) && !ghost;
+  const peaks = usePeaks(obj.assetId, showWave);
   return (
     <div
       className={`tl-object ${selected ? 'selected' : ''} ${locked ? 'locked' : ''} ${ghost ? 'dragging' : ''}`}
@@ -96,12 +109,26 @@ const ObjectItem = memo(function ObjectItem({
       style={{
         left: start * ppf,
         top: (layer - 1) * LAYER_H + 2,
-        width: Math.max(2, length * ppf),
+        width,
         height: LAYER_H - 4,
-        background: def.color,
+        backgroundColor: def.color,
+        backgroundImage: thumb ? `url(${thumb})` : undefined,
+        backgroundPosition: thumb ? '3px center' : undefined,
       }}
       title={`${def.label}：${label}`}
     >
+      {peaks && (
+        <Waveform
+          peaks={peaks}
+          offset={typeof obj.params.offset === 'number' ? obj.params.offset : 0}
+          duration={framesToSeconds(obj.length, fps)}
+          speed={(typeof obj.params.speed === 'number' ? obj.params.speed : 100) / 100}
+          loop={obj.params.loop === true}
+          assetDuration={assetDuration}
+          width={width}
+          height={LAYER_H - 6}
+        />
+      )}
       <span className="tl-object-label">{label}</span>
     </div>
   );
@@ -659,6 +686,8 @@ export function Timeline() {
                 selected={selectedSet.has(o.id)}
                 locked={lockedLayers.has(o.layer)}
                 ppf={ppf}
+                fps={fps}
+                assetDuration={assets.find((a) => a.id === o.assetId)?.durationSec ?? 0}
                 ghost={ghost?.get(o.id)}
               />
             ))}

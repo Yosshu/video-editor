@@ -13,6 +13,7 @@ import { pickFilesWithInput } from '../../storage/filePicker';
 import { commit, currentScene, getState, notify, useEditor } from '../../state/store';
 import { openContextMenu, openDialog } from '../../state/ui';
 import { formatBytes, formatDuration } from '../common/format';
+import { useThumbnail } from '../common/mediaHooks';
 
 export const ASSET_DRAG_TYPE = 'application/x-ved-asset';
 
@@ -64,6 +65,15 @@ function describe(asset: Asset): string {
   if (asset.durationSec) parts.push(formatDuration(asset.durationSec));
   parts.push(formatBytes(asset.size));
   return parts.join(' ・ ');
+}
+
+function AssetThumb({ asset }: { asset: Asset }) {
+  const url = useThumbnail(asset.kind === 'audio' ? undefined : asset.id);
+  return (
+    <span className="asset-kind" style={url ? { backgroundImage: `url(${url})` } : undefined}>
+      {url ? '' : KIND_LABEL[asset.kind]}
+    </span>
+  );
 }
 
 export function MediaBin() {
@@ -170,7 +180,7 @@ export function MediaBin() {
                     ]);
                   }}
                 >
-                  <span className="asset-kind">{KIND_LABEL[asset.kind]}</span>
+                  <AssetThumb asset={asset} />
                   <span className="asset-name">{asset.name}</span>
                   <span className="asset-meta">
                     {missing

@@ -314,9 +314,12 @@ textarea {
   grid-row: span 2;
   align-self: center;
   font-size: 11px;
-  padding: 2px 6px;
+  width: 48px;
+  height: 28px;
+  display: grid;
+  place-items: center;
   border-radius: 3px;
-  background: #3f6fb5;
+  background: #3f6fb5 center / cover no-repeat;
 }
 .kind-image .asset-kind {
   background: #7a54b5;
@@ -715,7 +718,25 @@ textarea {
   z-index: 2;
 }
 
+.tl-object {
+  background-repeat: no-repeat;
+  background-size: auto calc(100% - 4px);
+}
+
+.tl-waveform {
+  position: absolute;
+  left: 0;
+  top: 1px;
+  pointer-events: none;
+}
+
+.tl-object[style*='url('] .tl-object-label {
+  padding-left: 52px;
+}
+
 .tl-object-label {
+  position: relative;
+  text-shadow: 0 0 3px rgb(0 0 0 / 90%);
   padding: 0 6px;
   white-space: nowrap;
   overflow: hidden;

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
 import { checkAutosave, openProjectFile, startAutosave } from '../../app/projectFile';
 import { isProjectFileName } from '../../engine/media/detect';
+import { setupPreviewAudio } from '../../engine/preview/previewMediaInstance';
 import { getState } from '../../state/store';
 import { Inspector } from '../inspector/Inspector';
 import { MediaBin } from '../media-bin/MediaBin';
@@ -23,6 +24,7 @@ export function Editor() {
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
+    setupPreviewAudio();
     window.addEventListener('keydown', handleShortcut);
     const stopAutosave = startAutosave();
     void checkAutosave();
