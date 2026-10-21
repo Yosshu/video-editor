@@ -995,3 +995,137 @@ kbd {
   width: 100%;
   height: 14px;
 }
+
+/* ---------- アニメーション ---------- */
+
+.key-controls {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.key-button {
+  background: none;
+  border: none;
+  padding: 0 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.key-toggle {
+  font-size: 13px;
+}
+
+.key-toggle.animated {
+  color: var(--warning);
+}
+
+.key-toggle.on {
+  color: var(--warning);
+}
+
+.ease-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 2px 0 4px;
+  padding-left: 8px;
+  border-left: 2px solid var(--warning);
+}
+
+.ease-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ease-editor {
+  display: block;
+  margin-top: 4px;
+  touch-action: none;
+}
+
+.ease-frame {
+  fill: var(--bg-input);
+  stroke: var(--border);
+}
+
+.ease-curve {
+  fill: none;
+  stroke: var(--warning);
+  stroke-width: 2;
+}
+
+.ease-arm {
+  stroke: var(--text-dim);
+  stroke-dasharray: 3 2;
+}
+
+.ease-handle {
+  fill: var(--accent);
+  cursor: grab;
+}
+
+.midpoint-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tl-key {
+  position: absolute;
+  bottom: 1px;
+  width: 9px;
+  height: 9px;
+  margin-left: -4px;
+  background: var(--warning);
+  border: 1px solid #000;
+  transform: rotate(45deg);
+  cursor: ew-resize;
+  z-index: 1;
+}
+
+.handles .handle {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: all;
+}
+
+.scale-handle {
+  cursor: nwse-resize;
+}
+
+.rotate-handle {
+  cursor: grab;
+}
+
+.rotate-arm {
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.guide-grid line,
+.guide-safe rect {
+  stroke: rgb(255 255 255 / 45%);
+  stroke-width: 1;
+  fill: none;
+}
+
+.guide-safe rect {
+  stroke-dasharray: 4 4;
+}
+
+.guide-toggles {
+  display: flex;
+  gap: 10px;
+  margin-left: 14px;
+  color: var(--text-dim);
+}
+
+.guide-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

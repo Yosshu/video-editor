@@ -3,6 +3,7 @@ import { formatTimecode } from '../../core/model/time';
 import { sceneDuration } from '../../core/timeline/ops';
 import { playback } from '../../engine/playback/Playback';
 import { currentScene, useEditor, type PreviewQuality } from '../../state/store';
+import { useUi } from '../../state/ui';
 
 interface Props {
   quality: PreviewQuality;
@@ -11,6 +12,7 @@ interface Props {
 
 export function TransportBar({ quality, onQuality }: Props) {
   const playing = useEditor((s) => s.playing);
+  const guides = useUi((s) => s.previewGuides);
   const timecode = useEditor((s) => formatTimecode(s.playhead, s.project.settings.fps));
   const total = useEditor((s) =>
     formatTimecode(sceneDuration(currentScene(s)), s.project.settings.fps),
@@ -70,6 +72,28 @@ export function TransportBar({ quality, onQuality }: Props) {
       </button>
       <span className="timecode" data-testid="timecode">
         {timecode} / {total}
+      </span>
+      <span className="guide-toggles">
+        <label title="三分割線と中心を表示">
+          <input
+            type="checkbox"
+            checked={guides.grid}
+            onChange={(e) =>
+              useUi.setState({ previewGuides: { ...guides, grid: e.target.checked } })
+            }
+          />
+          グリッド
+        </label>
+        <label title="テロップを収める目安の枠を表示">
+          <input
+            type="checkbox"
+            checked={guides.safeArea}
+            onChange={(e) =>
+              useUi.setState({ previewGuides: { ...guides, safeArea: e.target.checked } })
+            }
+          />
+          セーフエリア
+        </label>
       </span>
       <label className="quality">
         画質

@@ -12,7 +12,9 @@ import {
   splitAtPlayhead,
   updateLayer,
 } from '../../app/actions';
+import { moveMidpointOf } from '../../app/animationActions';
 import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
+import { keyTimes } from '../../core/animation/keys';
 import { openProjectFile } from '../../app/projectFile';
 import { framesToSeconds, secondsToFrames } from '../../core/model/time';
 import type { Asset, ObjectType, Rational, Scene, TimelineObject } from '../../core/model/types';
@@ -130,6 +132,20 @@ const ObjectItem = memo(function ObjectItem({
         />
       )}
       <span className="tl-object-label">{label}</span>
+      {!ghost &&
+        width > 24 &&
+        keyTimes(obj.params, obj.length)
+          .filter((t) => t > 0)
+          .map((t) => (
+            <span
+              key={t}
+              className="tl-key"
+              data-key-time={t}
+              data-object-id={obj.id}
+              style={{ left: t * ppf }}
+              title={`中間点（${t} フレーム目）：ドラッグで移動、クリックでその時刻へ`}
+            />
+          ))}
     </div>
   );
 });
@@ -466,8 +482,42 @@ export function Timeline() {
     target.addEventListener('pointercancel', up);
   };
 
+  /** 中間点（キーの時刻）のドラッグ */
+  const startKeyDrag = (e: React.PointerEvent, keyEl: HTMLElement) => {
+    const obj = scene.objects.find((o) => o.id === keyEl.dataset.objectId);
+    if (!obj) return;
+    const from = Number(keyEl.dataset.keyTime);
+    const origin = locate(e.clientX, e.clientY);
+    let to = from;
+    let dragged = false;
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const p = locate(ev.clientX, ev.clientY);
+      if (!dragged && Math.abs(p.x - origin.x) < 3) return;
+      dragged = true;
+      to = Math.min(obj.length - 1, Math.max(1, from + Math.round((p.x - origin.x) / ppf)));
+      keyEl.style.left = `${to * ppf}px`;
+    };
+    const up = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      if (dragged && !lockedLayers.has(obj.layer)) moveMidpointOf(obj.id, from, to);
+      else keyEl.style.left = `${from * ppf}px`;
+      setSelection([obj.id]);
+      seek(obj.start + to);
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+  };
+
   const onTracksPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    const keyEl = (e.target as HTMLElement).closest<HTMLElement>('[data-key-time]');
+    if (keyEl) {
+      startKeyDrag(e, keyEl);
+      return;
+    }
     const objEl = (e.target as HTMLElement).closest<HTMLElement>('[data-object-id]');
     if (objEl) {
       const obj = scene.objects.find((o) => o.id === objEl.dataset.objectId);

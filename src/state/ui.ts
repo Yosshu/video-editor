@@ -22,12 +22,15 @@ export interface UiState {
   contextMenu: { x: number; y: number; items: (ContextMenuItem | 'separator')[] } | null;
   /** タイムラインの吸着 */
   snap: boolean;
+  /** プレビューの補助表示 */
+  previewGuides: { grid: boolean; safeArea: boolean };
 }
 
 export const useUi = create<UiState>(() => ({
   dialog: null,
   contextMenu: null,
   snap: true,
+  previewGuides: { grid: false, safeArea: false },
 }));
 
 export function openDialog(dialog: DialogState): void {
