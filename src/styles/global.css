@@ -1,0 +1,45 @@
+:root {
+  color-scheme: dark;
+  --bg: #1b1d22;
+  --bg-panel: #23262d;
+  --bg-elevated: #2c3038;
+  --border: #3a3f49;
+  --text: #e6e8ec;
+  --text-dim: #9aa1ad;
+  --accent: #4f8cff;
+  --danger: #ff5c5c;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    'Hiragino Sans',
+    'Yu Gothic UI',
+    Meiryo,
+    sans-serif;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.placeholder,
+.unsupported {
+  max-width: 640px;
+  margin: 10vh auto;
+  padding: 0 16px;
+  line-height: 1.7;
+}
+
+.version {
+  color: var(--text-dim);
+}

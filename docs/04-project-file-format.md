@@ -10,9 +10,9 @@
 
 ## 2. 拡張子（仮）
 
-| 種類 | 拡張子 | 中身 | 用途 |
-|---|---|---|---|
-| 編集ファイル | **`.vedproj`** | JSON（UTF-8） | 通常の保存。軽い（数 KB〜数 MB） |
+| 種類               | 拡張子         | 中身                                | 用途                                                    |
+| ------------------ | -------------- | ----------------------------------- | ------------------------------------------------------- |
+| 編集ファイル       | **`.vedproj`** | JSON（UTF-8）                       | 通常の保存。軽い（数 KB〜数 MB）                        |
 | 素材同梱パッケージ | **`.vedpack`** | ZIP（編集ファイル＋素材＋フォント） | 別の PC やブラウザへの持ち運び、バックアップ（Phase 8） |
 
 - 拡張子は独自に決められる。`ved` は "video editor" の略。アプリ名が決まったらそれに合わせて変更してよい（形式が確定する Phase 1 までに決める）。
@@ -21,11 +21,11 @@
 
 ## 3. 続きから編集する3つの方法
 
-| 方法 | 使う場面 | 素材の扱い |
-|---|---|---|
-| ① 自動保存から復元 | 同じブラウザでページを開き直したとき | ファイルハンドル（Chromium 系）または OPFS のコピーから自動で復元 |
+| 方法                               | 使う場面                               | 素材の扱い                                                                             |
+| ---------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------- |
+| ① 自動保存から復元                 | 同じブラウザでページを開き直したとき   | ファイルハンドル（Chromium 系）または OPFS のコピーから自動で復元                      |
 | ② 編集ファイル（`.vedproj`）を投下 | 保存した作品を開く、別のブラウザで開く | 復元できない素材は一覧表示し、素材ファイル（またはフォルダ）を投下してもらって自動照合 |
-| ③ パッケージ（`.vedpack`）を投下 | 別の PC へ持ち運ぶ | 素材が同梱されているので何もしなくてよい |
+| ③ パッケージ（`.vedpack`）を投下   | 別の PC へ持ち運ぶ                     | 素材が同梱されているので何もしなくてよい                                               |
 
 ### 3.1 素材の照合ルール
 
@@ -48,8 +48,8 @@
 
 ```jsonc
 {
-  "format": "vedproj",             // 形式の識別子
-  "formatVersion": 1,              // 形式のバージョン（整数）
+  "format": "vedproj", // 形式の識別子
+  "formatVersion": 1, // 形式のバージョン（整数）
   "generator": { "name": "video-editor", "version": "0.1.0" },
   "createdAt": "2026-10-21T12:00:00Z",
   "updatedAt": "2026-10-21T12:34:56Z",
@@ -57,15 +57,15 @@
   "settings": {
     "width": 1920,
     "height": 1080,
-    "fps": { "num": 30, "den": 1 },  // 29.97fps は { "num": 30000, "den": 1001 }
+    "fps": { "num": 30, "den": 1 }, // 29.97fps は { "num": 30000, "den": 1001 }
     "sampleRate": 48000,
     "audioChannels": 2,
-    "backgroundColor": "#000000"
+    "backgroundColor": "#000000",
   },
 
-  "assets": [ /* 素材の一覧（4.2） */ ],
+  "assets": [/* 素材の一覧（4.2） */],
   "rootSceneId": "sc_main",
-  "scenes": [ /* シーンの一覧（4.3） */ ]
+  "scenes": [/* シーンの一覧（4.3） */],
 }
 ```
 
@@ -74,15 +74,15 @@
 ```jsonc
 {
   "id": "as_7f3a",
-  "kind": "video",                 // video | image | audio | font
-  "name": "opening.mp4",           // 元のファイル名
+  "kind": "video", // video | image | audio | font
+  "name": "opening.mp4", // 元のファイル名
   "mimeType": "video/mp4",
-  "size": 52428800,                // バイト数
+  "size": 52428800, // バイト数
   "lastModified": 1760000000000,
-  "fingerprint": "ht1:9f2c…",      // 先頭・末尾の SHA-256（3.1）
+  "fingerprint": "ht1:9f2c…", // 先頭・末尾の SHA-256（3.1）
   "durationSec": 12.5,
   "video": { "width": 1920, "height": 1080, "codec": "avc1.640028", "frameRate": 29.97 },
-  "audio": { "sampleRate": 48000, "channels": 2, "codec": "mp4a.40.2" }
+  "audio": { "sampleRate": 48000, "channels": 2, "codec": "mp4a.40.2" },
 }
 ```
 
@@ -94,26 +94,31 @@
   "name": "メイン",
   "width": 1920,
   "height": 1080,
-  "length": 900,                   // シーンの長さ（フレーム）
-  "layers": [                      // 既定値から変更のあるレイヤーだけ記録
+  "length": 900, // シーンの長さ（フレーム）
+  "layers": [
+    // 既定値から変更のあるレイヤーだけ記録
     { "index": 1, "name": "背景" },
-    { "index": 3, "name": "字幕", "locked": true }
+    { "index": 3, "name": "字幕", "locked": true },
   ],
   "objects": [
     {
       "id": "ob_01",
       "type": "video",
-      "layer": 1,                  // 1 始まり
-      "start": 0,                  // 開始フレーム
-      "length": 300,               // 長さ（フレーム）
+      "layer": 1, // 1 始まり
+      "start": 0, // 開始フレーム
+      "length": 300, // 長さ（フレーム）
       "source": { "assetId": "as_7f3a", "offset": 0, "speed": 1.0, "loop": false },
       "transform": { "x": 0, "y": 0, "scale": 100, "opacity": 100, "rotation": 0 },
       "blend": "normal",
       "audio": { "volume": 100, "pan": 0, "fadeIn": 0, "fadeOut": 15 },
       "effects": [
-        { "id": "fx_01", "type": "colorAdjust", "enabled": true,
-          "params": { "brightness": 110, "saturation": 120 } }
-      ]
+        {
+          "id": "fx_01",
+          "type": "colorAdjust",
+          "enabled": true,
+          "params": { "brightness": 110, "saturation": 120 },
+        },
+      ],
     },
     {
       "id": "ob_02",
@@ -127,22 +132,27 @@
         "size": 96,
         "color": "#ffffff",
         "align": "center",
-        "outline": { "color": "#000000", "width": 6 }
+        "outline": { "color": "#000000", "width": 6 },
       },
       "transform": {
         "x": 0,
-        "y": { "keys": [                       // キーフレーム（4.4）
-          { "t": 0,  "v": 200, "ease": "easeOutCubic" },
-          { "t": 20, "v": 0 }
-        ] },
-        "opacity": { "keys": [
-          { "t": 0,  "v": 0, "ease": "linear" },
-          { "t": 10, "v": 100 }
-        ] }
+        "y": {
+          "keys": [
+            // キーフレーム（4.4）
+            { "t": 0, "v": 200, "ease": "easeOutCubic" },
+            { "t": 20, "v": 0 },
+          ],
+        },
+        "opacity": {
+          "keys": [
+            { "t": 0, "v": 0, "ease": "linear" },
+            { "t": 10, "v": 100 },
+          ],
+        },
       },
-      "effects": []
-    }
-  ]
+      "effects": [],
+    },
+  ],
 }
 ```
 

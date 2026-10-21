@@ -10,35 +10,35 @@
 
 ## 2. 技術スタック
 
-| 用途 | 採用候補 | 理由・備考 |
-|---|---|---|
-| 言語 | TypeScript | 型でデータ構造の整合性を保つ |
-| ビルド | Vite | 高速、Worker・WASM・静的サイト出力が簡単 |
-| UI | React | 部品・情報が多い。再生中の頻繁な描画は React を通さず Canvas に直接描くため、フレームワークの重さは問題になりにくい |
-| 状態管理 | Zustand + Immer | Immer の差分（パッチ）を使って元に戻す/やり直しを実装しやすい |
-| データ検証 | Zod | 編集ファイル読み込み時の形式検証と型の自動生成 |
-| 合成描画 | WebGL2（自前の薄いレンダラー） | ほぼ全ブラウザで使える。合成モードやエフェクトをシェーダーで書く。将来 WebGPU 版を追加できるよう抽象化する |
-| テキスト描画 | Canvas 2D（OffscreenCanvas）→ テクスチャ | 日本語の文字組み・フォントをブラウザに任せる |
-| 動画・音声の読み書き | Mediabunny（MPL-2.0） | MP4 / MOV / WebM / MKV / MP3 / WAV / Ogg / FLAC などの分離・多重化と WebCodecs の連携をまとめて扱える。ファイル全体を読み込まないストリーム処理に対応 |
-| デコード・エンコード | WebCodecs | ハードウェア支援が効く。対応コーデックは `isConfigSupported()` で実行時に確認 |
-| 音声処理 | Web Audio API（AudioContext / AudioWorklet / OfflineAudioContext） | 再生・ミックス・エフェクト・書き出し用の高速レンダリング |
-| ファイル保存 | File System Access API（Chromium 系）＋ ダウンロード方式（その他） | 上書き保存できる環境では上書き、できない環境ではダウンロード |
-| ブラウザ内保存 | IndexedDB ＋ OPFS（Origin Private File System） | 自動保存、素材のキャッシュ、ファイルハンドルの保持 |
-| ZIP | fflate または zip.js | 素材同梱パッケージ用（Phase 8） |
-| テスト | Vitest（単体）、Playwright（E2E・描画結果の比較） | |
-| 品質 | ESLint、Prettier、TypeScript の strict モード | |
-| CI/CD | GitHub Actions → GitHub Pages | |
+| 用途                 | 採用候補                                                           | 理由・備考                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 言語                 | TypeScript                                                         | 型でデータ構造の整合性を保つ                                                                                                                          |
+| ビルド               | Vite                                                               | 高速、Worker・WASM・静的サイト出力が簡単                                                                                                              |
+| UI                   | React                                                              | 部品・情報が多い。再生中の頻繁な描画は React を通さず Canvas に直接描くため、フレームワークの重さは問題になりにくい                                   |
+| 状態管理             | Zustand + Immer                                                    | Immer の差分（パッチ）を使って元に戻す/やり直しを実装しやすい                                                                                         |
+| データ検証           | Zod                                                                | 編集ファイル読み込み時の形式検証と型の自動生成                                                                                                        |
+| 合成描画             | WebGL2（自前の薄いレンダラー）                                     | ほぼ全ブラウザで使える。合成モードやエフェクトをシェーダーで書く。将来 WebGPU 版を追加できるよう抽象化する                                            |
+| テキスト描画         | Canvas 2D（OffscreenCanvas）→ テクスチャ                           | 日本語の文字組み・フォントをブラウザに任せる                                                                                                          |
+| 動画・音声の読み書き | Mediabunny（MPL-2.0）                                              | MP4 / MOV / WebM / MKV / MP3 / WAV / Ogg / FLAC などの分離・多重化と WebCodecs の連携をまとめて扱える。ファイル全体を読み込まないストリーム処理に対応 |
+| デコード・エンコード | WebCodecs                                                          | ハードウェア支援が効く。対応コーデックは `isConfigSupported()` で実行時に確認                                                                         |
+| 音声処理             | Web Audio API（AudioContext / AudioWorklet / OfflineAudioContext） | 再生・ミックス・エフェクト・書き出し用の高速レンダリング                                                                                              |
+| ファイル保存         | File System Access API（Chromium 系）＋ ダウンロード方式（その他） | 上書き保存できる環境では上書き、できない環境ではダウンロード                                                                                          |
+| ブラウザ内保存       | IndexedDB ＋ OPFS（Origin Private File System）                    | 自動保存、素材のキャッシュ、ファイルハンドルの保持                                                                                                    |
+| ZIP                  | fflate または zip.js                                               | 素材同梱パッケージ用（Phase 8）                                                                                                                       |
+| テスト               | Vitest（単体）、Playwright（E2E・描画結果の比較）                  |                                                                                                                                                       |
+| 品質                 | ESLint、Prettier、TypeScript の strict モード                      |                                                                                                                                                       |
+| CI/CD                | GitHub Actions → GitHub Pages                                      |                                                                                                                                                       |
 
 将来の選択肢：WebGPU（描画の高速化）、WebAssembly のデコーダー（ブラウザ非対応コーデック）、ブラウザ内推論（AI 機能）。
 
 ## 3. ブラウザ対応方針
 
-| ブラウザ | 方針 |
-|---|---|
-| Chrome / Edge（PC） | 主対象。全機能を動かす |
-| Firefox（PC） | WebCodecs は対応済み。File System Access API がないため保存はダウンロード方式。AAC エンコードなど一部コーデックは環境依存 |
-| Safari（Mac） | 26 以降で WebCodecs の音声も対応。保存はダウンロード方式 |
-| スマホ・タブレット | 当面対象外（起動時に案内を表示） |
+| ブラウザ            | 方針                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Chrome / Edge（PC） | 主対象。全機能を動かす                                                                                                    |
+| Firefox（PC）       | WebCodecs は対応済み。File System Access API がないため保存はダウンロード方式。AAC エンコードなど一部コーデックは環境依存 |
+| Safari（Mac）       | 26 以降で WebCodecs の音声も対応。保存はダウンロード方式                                                                  |
+| スマホ・タブレット  | 当面対象外（起動時に案内を表示）                                                                                          |
 
 - 機能の有無はブラウザ名ではなく **機能検出** で判定する（`'VideoEncoder' in window`、`isConfigSupported()` など）。
 - WebCodecs・OPFS・File System Access API は **安全なコンテキスト（HTTPS）** が必要。GitHub Pages は HTTPS なので問題ない。
@@ -212,65 +212,30 @@ defineEffect({
 
 ### 13.1 制約と対応
 
-| 制約 | 対応 |
-|---|---|
-| サイトは `https://yosshu.github.io/video-editor/` のサブパスで公開される | Vite の `base` を `/video-editor/` にする。画面遷移はページ内で完結させる（パスによるルーティングは使わない） |
-| HTTP ヘッダーを設定できない（COOP/COEP 不可） | `SharedArrayBuffer`（マルチスレッド WASM 等）を前提にしない設計にする。WebCodecs・WebGL2・Web Audio はヘッダーなしで使える |
-| サーバー処理なし | すべてブラウザ内で処理する |
+| 制約                                                                     | 対応                                                                                                                       |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| サイトは `https://yosshu.github.io/video-editor/` のサブパスで公開される | Vite の `base` を `/video-editor/` にする。画面遷移はページ内で完結させる（パスによるルーティングは使わない）              |
+| HTTP ヘッダーを設定できない（COOP/COEP 不可）                            | `SharedArrayBuffer`（マルチスレッド WASM 等）を前提にしない設計にする。WebCodecs・WebGL2・Web Audio はヘッダーなしで使える |
+| サーバー処理なし                                                         | すべてブラウザ内で処理する                                                                                                 |
 
 ### 13.2 デプロイの流れ
 
+ワークフローは `.github/workflows/ci.yml`。
+
+| きっかけ                              | 実行する内容                                                   |
+| ------------------------------------- | -------------------------------------------------------------- |
+| すべての push・Pull Request           | 書式チェック、lint、型チェック、単体テスト、ビルド、E2E テスト |
+| デフォルトブランチ（`main`）への push | 上記に加えて、ビルド結果を GitHub Pages にデプロイ             |
+
 - Pages の Source は「GitHub Actions」（設定済み）。
-- `main` ブランチへの push で、ビルド → Pages へデプロイする。
-- Pull Request では lint・型チェック・テスト・ビルドだけを実行する。
-
-ワークフローの骨子（Phase 0 で作成。各 action のバージョンは作成時に最新を確認する）：
-
-```yaml
-name: Deploy to GitHub Pages
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: pages
-  cancel-in-progress: false
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run lint && npm run typecheck && npm test
-      - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-```
+- デプロイ対象はブランチ名を固定せず「リポジトリのデフォルトブランチ」で判定する。
+- `github-pages` 環境のデプロイ許可ブランチに、デフォルトブランチが含まれている必要がある。
 
 ## 14. テスト方針
 
-| 種類 | 対象 | 方法 |
-|---|---|---|
-| 単体テスト | 衝突判定、分割、スナップ、補間、Evaluator、編集ファイルの保存→読込の往復、バージョン移行 | Vitest |
-| 描画テスト | 代表的なシーンを描画し、基準画像と許容誤差つきで比較 | Playwright（Chromium） |
-| E2E テスト | 素材取り込み → 編集 → 書き出し、保存 → 開き直し | Playwright。書き出したファイルの長さ・フレーム数を検証 |
-| 手動確認 | Firefox / Safari での動作、実素材での性能 | リリース前のチェックリスト |
+| 種類       | 対象                                                                                     | 方法                                                   |
+| ---------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 単体テスト | 衝突判定、分割、スナップ、補間、Evaluator、編集ファイルの保存→読込の往復、バージョン移行 | Vitest                                                 |
+| 描画テスト | 代表的なシーンを描画し、基準画像と許容誤差つきで比較                                     | Playwright（Chromium）                                 |
+| E2E テスト | 素材取り込み → 編集 → 書き出し、保存 → 開き直し                                          | Playwright。書き出したファイルの長さ・フレーム数を検証 |
+| 手動確認   | Firefox / Safari での動作、実素材での性能                                                | リリース前のチェックリスト                             |

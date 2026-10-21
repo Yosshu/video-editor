@@ -11,3 +11,9 @@
 - ブラウザだけで動く静的サイト。サーバー処理は持たず、素材を外部に送信しない。
 - 公開先は GitHub Pages（GitHub Actions でデプロイ、URL は `https://yosshu.github.io/video-editor/`）。
 - 設計の詳細は `docs/03-architecture.md`、実装順は `docs/05-roadmap.md` を参照。
+
+## コマンド
+
+- `npm run dev` / `npm run build` / `npm run preview`
+- 確認：`npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:e2e`
+- 書式の自動修正：`npm run format`
