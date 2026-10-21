@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { checkSupport } from '../../env/support';
+import { Editor } from './Editor';
 
 export function App() {
   const support = useMemo(() => checkSupport(), []);
@@ -18,11 +19,5 @@ export function App() {
     );
   }
 
-  return (
-    <main className="placeholder">
-      <h1>Video Editor</h1>
-      <p>ブラウザだけで動くレイヤー型の動画編集アプリ（準備中）</p>
-      <p className="version">v{__APP_VERSION__}</p>
-    </main>
-  );
+  return <Editor />;
 }

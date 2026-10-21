@@ -94,7 +94,6 @@
   "name": "メイン",
   "width": 1920,
   "height": 1080,
-  "length": 900, // シーンの長さ（フレーム）
   "layers": [
     // 既定値から変更のあるレイヤーだけ記録
     { "index": 1, "name": "背景" },
@@ -107,10 +106,9 @@
       "layer": 1, // 1 始まり
       "start": 0, // 開始フレーム
       "length": 300, // 長さ（フレーム）
-      "source": { "assetId": "as_7f3a", "offset": 0, "speed": 1.0, "loop": false },
-      "transform": { "x": 0, "y": 0, "scale": 100, "opacity": 100, "rotation": 0 },
-      "blend": "normal",
-      "audio": { "volume": 100, "pan": 0, "fadeIn": 0, "fadeOut": 15 },
+      "assetId": "as_7f3a",
+      // 既定値から変更したパラメータだけを記録する（4.4）
+      "params": { "offset": 2.5, "speed": 100, "volume": 80, "fadeOut": 0.5 },
       "effects": [
         {
           "id": "fx_01",
@@ -126,16 +124,11 @@
       "layer": 3,
       "start": 30,
       "length": 120,
-      "text": {
-        "content": "タイトル",
+      "params": {
+        "text": "タイトル",
         "font": "Noto Sans JP",
         "size": 96,
-        "color": "#ffffff",
-        "align": "center",
-        "outline": { "color": "#000000", "width": 6 },
-      },
-      "transform": {
-        "x": 0,
+        "outlineWidth": 6,
         "y": {
           "keys": [
             // キーフレーム（4.4）
@@ -156,8 +149,15 @@
 }
 ```
 
-- `type` の種類：`video` `image` `audio` `text` `shape` `solid` `scene`（以上メディア）、`filter` `group` `timeControl` `camera` `partialFilter`（以上制御）。
-- 省略したパラメータは既定値とみなす（ファイルを小さく保ち、既定値の変更にも追従しやすくする）。
+- `type` の種類（現在）：`video` `image` `audio` `text` `shape` `solid`。今後 `scene`（シーン）、`filter` `group` `timeControl` `camera` `partialFilter`（制御オブジェクト）を追加する。
+- パラメータはオブジェクトの種類ごとに定義されている（`src/core/objects/definitions.ts`）。省略したパラメータは既定値とみなす（ファイルを小さく保ち、既定値の変更にも追従しやすくする）。
+- 主なパラメータ
+  - 配置：`x` `y`（px、画面中央が原点）、`scale`（%）、`rotation`（度）、`opacity`（%）、`flipH` `flipV`、`blend`（合成モード）
+  - フェード：`fadeIn` `fadeOut`（秒）
+  - 動画・音声：`offset`（素材の再生開始位置、秒）、`speed`（%）、`loop`、`volume`（%）、`pan`（-100〜100）
+  - テキスト：`text` `font` `size` `color` `bold` `italic` `align` `lineHeight` `letterSpacing` `outlineWidth` `outlineColor` `shadow` など
+  - 図形：`shape` `width` `height` `color` `strokeWidth` `cornerRadius` `starInner`
+- シーンの長さは、最後のオブジェクトの終了位置で決まる（保存しない）。
 
 ### 4.4 パラメータとキーフレームの表し方
 
@@ -176,7 +176,7 @@
 
 - 時間はすべて **整数のフレーム番号**。フレームレートは `settings.fps` に有理数で持つ（29.97fps などの誤差を出さないため）。
 - フレームレートを後から変更した場合は、すべての時間を換算して丸める。
-- 素材内の時刻（`source.offset`）は素材側のフレームレートが異なりうるため秒（小数）で持つ。
+- 素材内の時刻（`offset`）は素材側のフレームレートが異なりうるため秒（小数）で持つ。
 
 ## 5. バージョン管理と移行
 
