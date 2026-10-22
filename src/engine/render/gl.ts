@@ -1,3 +1,4 @@
+import { t } from '../../i18n';
 /** WebGL2 の小さな補助関数 */
 
 export function compileShader(
@@ -6,13 +7,13 @@ export function compileShader(
   source: string,
 ): WebGLShader {
   const shader = gl.createShader(type);
-  if (!shader) throw new Error('シェーダーを作成できません');
+  if (!shader) throw new Error(t('シェーダーを作成できません'));
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
     const log = gl.getShaderInfoLog(shader);
     gl.deleteShader(shader);
-    throw new Error(`シェーダーのコンパイルに失敗しました: ${log}`);
+    throw new Error(t('シェーダーのコンパイルに失敗しました: {0}', log ?? ''));
   }
   return shader;
 }
@@ -29,7 +30,7 @@ export function createProgram(
   uniformNames: string[],
 ): Program {
   const program = gl.createProgram();
-  if (!program) throw new Error('プログラムを作成できません');
+  if (!program) throw new Error(t('プログラムを作成できません'));
   const vs = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
   const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
   gl.attachShader(program, vs);
@@ -39,7 +40,9 @@ export function createProgram(
   gl.deleteShader(vs);
   gl.deleteShader(fs);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error(`シェーダーのリンクに失敗しました: ${gl.getProgramInfoLog(program)}`);
+    throw new Error(
+      t('シェーダーのリンクに失敗しました: {0}', gl.getProgramInfoLog(program) ?? ''),
+    );
   }
   const uniforms: Record<string, WebGLUniformLocation | null> = {};
   for (const name of uniformNames) uniforms[name] = gl.getUniformLocation(program, name);
@@ -60,7 +63,7 @@ export function createRenderTarget(
 ): RenderTarget {
   const texture = gl.createTexture();
   const framebuffer = gl.createFramebuffer();
-  if (!texture || !framebuffer) throw new Error('描画先を作成できません');
+  if (!texture || !framebuffer) throw new Error(t('描画先を作成できません'));
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);

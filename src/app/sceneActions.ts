@@ -1,6 +1,7 @@
 import type { Project } from '../core/model/types';
 import { createScene } from '../core/project/factory';
 import { commit, getState, notify, useEditor } from '../state/store';
+import { t } from '../i18n';
 
 /** シーン target が、シーン from を（入れ子のどこかで）含んでいるか */
 export function sceneContains(
@@ -37,11 +38,11 @@ export function switchScene(sceneId: string): void {
 export function addScene(): void {
   const { project } = getState();
   const scene = createScene(
-    `シーン ${project.scenes.length}`,
+    t('シーン {0}', project.scenes.length),
     project.settings.width,
     project.settings.height,
   );
-  commit('シーンの追加', (draft) => {
+  commit(t('シーンの追加'), (draft) => {
     draft.scenes.push(scene);
   });
   switchScene(scene.id);
@@ -49,7 +50,7 @@ export function addScene(): void {
 
 export function renameScene(sceneId: string, name: string): void {
   if (!name.trim()) return;
-  commit('シーン名の変更', (draft) => {
+  commit(t('シーン名の変更'), (draft) => {
     const s = draft.scenes.find((x) => x.id === sceneId);
     if (s) s.name = name.trim();
   });
@@ -58,7 +59,7 @@ export function renameScene(sceneId: string, name: string): void {
 export function deleteScene(sceneId: string): void {
   const { project } = getState();
   if (sceneId === project.rootSceneId) {
-    notify('メインのシーンは削除できません。', 'error');
+    notify(t('メインのシーンは削除できません。'), 'error');
     return;
   }
   const used = project.scenes.some((s) =>
@@ -66,10 +67,10 @@ export function deleteScene(sceneId: string): void {
   );
   if (
     used &&
-    !window.confirm('このシーンを表示しているシーンオブジェクトがあります。削除しますか？')
+    !window.confirm(t('このシーンを表示しているシーンオブジェクトがあります。削除しますか？'))
   )
     return;
-  commit('シーンの削除', (draft) => {
+  commit(t('シーンの削除'), (draft) => {
     draft.scenes = draft.scenes.filter((s) => s.id !== sceneId);
   });
   useEditor.setState({ sceneId: getState().project.rootSceneId, selection: [] });

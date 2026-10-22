@@ -9,6 +9,7 @@ import { getObjectDef } from '../../../core/objects/definitions';
 import { usePresets } from '../../../state/presets';
 import { closeDialog } from '../../../state/ui';
 import { Dialog } from '../../common/Dialog';
+import { t } from '../../../i18n';
 
 function PresetRow({
   kind,
@@ -29,20 +30,21 @@ function PresetRow({
         <button
           type="button"
           onClick={() => {
-            const next = window.prompt('プリセットの名前', name);
+            const next = window.prompt(t('プリセットの名前'), name);
             if (next) renamePreset(kind, id, next);
           }}
         >
-          名前を変更
+          {t('名前を変更')}
         </button>
         <button
           type="button"
-          aria-label={`${name}を削除`}
+          aria-label={t('{0}を削除', name)}
           onClick={() => {
-            if (window.confirm(`プリセット「${name}」を削除しますか？`)) deletePreset(kind, id);
+            if (window.confirm(t('プリセット「{0}」を削除しますか？', name)))
+              deletePreset(kind, id);
           }}
         >
-          削除
+          {t('削除')}
         </button>
       </td>
     </tr>
@@ -54,34 +56,35 @@ export function PresetsDialog() {
   const { objects, effects } = usePresets();
   return (
     <Dialog
-      title="プリセット"
+      title={t('プリセット')}
       onClose={closeDialog}
       width={560}
       footer={
         <>
           <button type="button" onClick={() => void importPresets()}>
-            ファイルから読み込む…
+            {t('ファイルから読み込む…')}
           </button>
           <button
             type="button"
             onClick={exportPresets}
             disabled={objects.length + effects.length === 0}
           >
-            ファイルに書き出す
+            {t('ファイルに書き出す')}
           </button>
           <button type="button" onClick={closeDialog}>
-            閉じる
+            {t('閉じる')}
           </button>
         </>
       }
     >
       <p className="hint">
-        オブジェクトの設定は設定パネルの「プリセット…」、エフェクトの設定は各エフェクトの ☆
-        から保存します。プリセットはこのブラウザに保存され、どのプロジェクトでも使えます。
+        {t(
+          'オブジェクトの設定は設定パネルの「プリセット…」、エフェクトの設定は各エフェクトの ☆ から保存します。プリセットはこのブラウザに保存され、どのプロジェクトでも使えます。',
+        )}
       </p>
-      <h3 className="dialog-subtitle">オブジェクト（{objects.length}）</h3>
+      <h3 className="dialog-subtitle">{t('オブジェクト（{0}）', objects.length)}</h3>
       {objects.length === 0 ? (
-        <p className="dim">まだありません。</p>
+        <p className="dim">{t('まだありません。')}</p>
       ) : (
         <table className="preset-table">
           <tbody>
@@ -91,15 +94,15 @@ export function PresetsDialog() {
                 kind="objects"
                 id={p.id}
                 name={p.name}
-                typeLabel={getObjectDef(p.type)?.label ?? p.type}
+                typeLabel={t(getObjectDef(p.type)?.label ?? p.type)}
               />
             ))}
           </tbody>
         </table>
       )}
-      <h3 className="dialog-subtitle">エフェクト（{effects.length}）</h3>
+      <h3 className="dialog-subtitle">{t('エフェクト（{0}）', effects.length)}</h3>
       {effects.length === 0 ? (
-        <p className="dim">まだありません。</p>
+        <p className="dim">{t('まだありません。')}</p>
       ) : (
         <table className="preset-table">
           <tbody>
@@ -109,7 +112,7 @@ export function PresetsDialog() {
                 kind="effects"
                 id={p.id}
                 name={p.name}
-                typeLabel={getEffectDef(p.type)?.label ?? p.type}
+                typeLabel={t(getEffectDef(p.type)?.label ?? p.type)}
               />
             ))}
           </tbody>

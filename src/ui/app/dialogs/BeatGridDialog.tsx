@@ -4,6 +4,7 @@ import { DEFAULT_BEAT_GRID } from '../../../core/timeline/markers';
 import { currentScene, useEditor } from '../../../state/store';
 import { closeDialog } from '../../../state/ui';
 import { Dialog } from '../../common/Dialog';
+import { t } from '../../../i18n';
 
 /** BPM グリッドの設定（変更はすぐにタイムラインへ反映する） */
 export function BeatGridDialog() {
@@ -15,24 +16,24 @@ export function BeatGridDialog() {
 
   return (
     <Dialog
-      title="BPM グリッド"
+      title={t('BPM グリッド')}
       onClose={closeDialog}
       width={420}
       footer={
         <>
           {grid && (
             <button type="button" onClick={() => setBeatGrid(null)}>
-              グリッドを削除
+              {t('グリッドを削除')}
             </button>
           )}
           <button type="button" onClick={closeDialog}>
-            閉じる
+            {t('閉じる')}
           </button>
         </>
       }
     >
       <div className="form-grid">
-        <label htmlFor="bg-visible">表示</label>
+        <label htmlFor="bg-visible">{t('表示')}</label>
         <label className="inline">
           <input
             id="bg-visible"
@@ -40,7 +41,7 @@ export function BeatGridDialog() {
             checked={current.visible}
             onChange={(e) => update({ visible: e.target.checked })}
           />
-          タイムラインに拍の線を表示し、拍に吸着する
+          {t('タイムラインに拍の線を表示し、拍に吸着する')}
         </label>
         <label htmlFor="bg-bpm">BPM</label>
         <input
@@ -55,7 +56,7 @@ export function BeatGridDialog() {
             if (v >= 1 && v <= 1000) update({ bpm: v });
           }}
         />
-        <label htmlFor="bg-beats">1 小節の拍数</label>
+        <label htmlFor="bg-beats">{t('1 小節の拍数')}</label>
         <input
           id="bg-beats"
           type="number"
@@ -68,7 +69,7 @@ export function BeatGridDialog() {
             if (v >= 1 && v <= 64) update({ beatsPerBar: v });
           }}
         />
-        <label htmlFor="bg-offset">1 拍目の位置</label>
+        <label htmlFor="bg-offset">{t('1 拍目の位置')}</label>
         <span className="inline">
           <input
             id="bg-offset"
@@ -80,14 +81,16 @@ export function BeatGridDialog() {
               if (Number.isFinite(v)) update({ offset: secondsToFrames(v, fps) });
             }}
           />
-          秒
+          {t('秒')}
           <button type="button" onClick={() => update({ offset: playhead })}>
-            再生位置にする
+            {t('再生位置にする')}
           </button>
         </span>
       </div>
       <p className="hint">
-        曲の BPM を入れると、拍と小節の頭に線が引かれます。オブジェクトを動かすと拍に吸着します。
+        {t(
+          '曲の BPM を入れると、拍と小節の頭に線が引かれます。オブジェクトを動かすと拍に吸着します。',
+        )}
       </p>
     </Dialog>
   );

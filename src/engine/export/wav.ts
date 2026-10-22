@@ -4,6 +4,7 @@ import { mixScene } from '../audio/mixer';
 import { AudioReaderPool } from '../audio/sources';
 import { assetRegistry } from '../media/registry';
 import { ExportCanceledError, type ExportProgress } from './exporter';
+import { t } from '../../i18n';
 
 const CHUNK_SEC = 1;
 
@@ -68,7 +69,7 @@ export async function exportWav(
     await write(wavHeader(totalSamples, sr));
     let done = 0;
     while (done < totalSamples) {
-      if (signal.aborted) throw new ExportCanceledError('書き出しを中止しました。');
+      if (signal.aborted) throw new ExportCanceledError(t('書き出しを中止しました。'));
       const n = Math.min(Math.round(CHUNK_SEC * sr), totalSamples - done);
       const [l, r] = await mixScene(project, scene, start + done / sr, n, pool);
       await write(toInt16Interleaved(l, r));

@@ -1,6 +1,7 @@
 import { addScene, deleteScene, renameScene, switchScene } from '../../app/sceneActions';
 import { useEditor } from '../../state/store';
 import { openContextMenu } from '../../state/ui';
+import { t } from '../../i18n';
 
 /** シーンの切り替えタブ */
 export function SceneTabs() {
@@ -9,10 +10,10 @@ export function SceneTabs() {
   const current = useEditor((s) => s.sceneId);
 
   return (
-    <div className="scene-tabs" role="tablist" aria-label="シーン">
+    <div className="scene-tabs" role="tablist" aria-label={t('シーン')}>
       {scenes.map((s) => {
         const rename = () => {
-          const name = window.prompt('シーンの名前', s.name);
+          const name = window.prompt(t('シーンの名前'), s.name);
           if (name !== null) renameScene(s.id, name);
         };
         return (
@@ -27,16 +28,18 @@ export function SceneTabs() {
             onContextMenu={(e) => {
               e.preventDefault();
               openContextMenu(e.clientX, e.clientY, [
-                { label: '名前を変更…', action: rename },
+                { label: t('名前を変更…'), action: rename },
                 {
-                  label: 'シーンを削除',
+                  label: t('シーンを削除'),
                   disabled: s.id === rootId,
                   action: () => deleteScene(s.id),
                 },
               ]);
             }}
             title={
-              s.id === rootId ? 'メインのシーン（書き出しの対象）' : 'ダブルクリックで名前を変更'
+              s.id === rootId
+                ? t('メインのシーン（書き出しの対象）')
+                : t('ダブルクリックで名前を変更')
             }
           >
             {s.name}
@@ -47,8 +50,8 @@ export function SceneTabs() {
         type="button"
         className="scene-tab add"
         onClick={addScene}
-        title="シーンを追加"
-        aria-label="シーンを追加"
+        title={t('シーンを追加')}
+        aria-label={t('シーンを追加')}
       >
         ＋
       </button>

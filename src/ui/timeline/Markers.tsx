@@ -5,11 +5,12 @@ import { beatsInRange, framesPerBeat, MARKER_COLORS } from '../../core/timeline/
 import { playback } from '../../engine/playback/Playback';
 import { setPlayhead } from '../../state/store';
 import { openContextMenu } from '../../state/ui';
+import { t } from '../../i18n';
 
 const DEFAULT_COLOR = MARKER_COLORS[0].value;
 
 function renameMarker(m: Marker): void {
-  const label = window.prompt('マーカーの名前', m.label ?? '');
+  const label = window.prompt(t('マーカーの名前'), m.label ?? '');
   if (label !== null) updateMarker(m.id, { label: label.trim() });
 }
 
@@ -62,7 +63,15 @@ export function RulerMarkers({
           key={m.id}
           className="tl-marker"
           style={{ left: m.frame * ppf, color: m.color ?? DEFAULT_COLOR }}
-          title={`${m.label ? `${m.label}（` : ''}${formatTimecode(m.frame, fps)}${m.label ? '）' : ''}：ドラッグで移動、ダブルクリックで名前を変更`}
+          title={
+            m.label
+              ? t(
+                  '{0}（{1}）：ドラッグで移動、ダブルクリックで名前を変更',
+                  m.label,
+                  formatTimecode(m.frame, fps),
+                )
+              : t('{0}：ドラッグで移動、ダブルクリックで名前を変更', formatTimecode(m.frame, fps))
+          }
           data-testid="marker"
           onPointerDown={(e) => onPointerDown(e, m)}
           onDoubleClick={(e) => {
@@ -73,13 +82,17 @@ export function RulerMarkers({
             e.preventDefault();
             e.stopPropagation();
             openContextMenu(e.clientX, e.clientY, [
-              { label: '名前を変更…', action: () => renameMarker(m) },
+              { label: t('名前を変更…'), action: () => renameMarker(m) },
               ...MARKER_COLORS.map((c) => ({
-                label: `色：${c.label}${(m.color ?? DEFAULT_COLOR) === c.value ? '（現在）' : ''}`,
+                label: t(
+                  '色：{0}{1}',
+                  t(c.label),
+                  (m.color ?? DEFAULT_COLOR) === c.value ? t('（現在）') : '',
+                ),
                 action: () => updateMarker(m.id, { color: c.value }),
               })),
               'separator' as const,
-              { label: 'マーカーを削除', action: () => removeMarker(m.id) },
+              { label: t('マーカーを削除'), action: () => removeMarker(m.id) },
             ]);
           }}
         >

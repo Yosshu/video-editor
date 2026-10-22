@@ -6,6 +6,7 @@ import {
   type InputVideoTrack,
 } from 'mediabunny';
 import type { Asset } from '../../core/model/types';
+import { t } from '../../i18n';
 
 export class MediaOpenError extends Error {}
 
@@ -27,17 +28,21 @@ export interface MediaSourceHandle {
 export async function openMediaSource(file: Blob): Promise<MediaSourceHandle> {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
-    if (!(await input.canRead())) throw new MediaOpenError('対応していない形式のファイルです。');
+    if (!(await input.canRead())) throw new MediaOpenError(t('対応していない形式のファイルです。'));
     let videoTrack = await input.getPrimaryVideoTrack();
     let audioTrack = await input.getPrimaryAudioTrack();
     if (videoTrack && !(await videoTrack.canDecode())) {
-      const codec = (await videoTrack.getCodec()) ?? '不明';
+      const codec = (await videoTrack.getCodec()) ?? t('不明');
       throw new MediaOpenError(
-        `この動画のコーデック（${codec}）はこのブラウザでは読み込めません。H.264 / VP9 / AV1 などに変換してからお試しください。`,
+        t(
+          'この動画のコーデック（{0}）はこのブラウザでは読み込めません。H.264 / VP9 / AV1 などに変換してからお試しください。',
+          codec,
+        ),
       );
     }
     if (audioTrack && !(await audioTrack.canDecode())) audioTrack = null;
-    if (!videoTrack && !audioTrack) throw new MediaOpenError('映像・音声が見つかりませんでした。');
+    if (!videoTrack && !audioTrack)
+      throw new MediaOpenError(t('映像・音声が見つかりませんでした。'));
     const tracks = [videoTrack, audioTrack].filter(
       (t): t is InputVideoTrack | InputAudioTrack => !!t,
     );
@@ -64,7 +69,7 @@ export async function openMediaSource(file: Blob): Promise<MediaSourceHandle> {
     input.dispose();
     if (e instanceof MediaOpenError) throw e;
     throw new MediaOpenError(
-      'ファイルを読み込めませんでした。壊れているか、対応していない形式の可能性があります。',
+      t('ファイルを読み込めませんでした。壊れているか、対応していない形式の可能性があります。'),
     );
   }
 }

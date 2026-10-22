@@ -9,6 +9,7 @@ import type {
   TextParamDef,
 } from '../../core/params/defs';
 import { clampNumber } from '../../core/params/defs';
+import { t } from '../../i18n';
 
 const COMMON_FONTS = [
   'sans-serif',
@@ -70,7 +71,7 @@ export function NumberField({
         <label
           htmlFor={id}
           className="field-label scrub"
-          title="左右にドラッグして値を変更"
+          title={t('左右にドラッグして値を変更')}
           onPointerDown={(e) => {
             if (disabled || e.button !== 0) return;
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -85,7 +86,7 @@ export function NumberField({
           onPointerUp={() => (dragRef.current = null)}
           onPointerCancel={() => (dragRef.current = null)}
         >
-          {def.label}
+          {t(def.label)}
         </label>
         {extra}
       </div>
@@ -93,7 +94,7 @@ export function NumberField({
         {sliderMin !== undefined && sliderMax !== undefined && (
           <input
             type="range"
-            aria-label={`${def.label}（スライダー）`}
+            aria-label={t('{0}（スライダー）', t(def.label))}
             min={sliderMin}
             max={sliderMax}
             step={def.step ?? 1}
@@ -119,7 +120,7 @@ export function NumberField({
           }}
           onBlur={() => setText(null)}
         />
-        {def.unit && <span className="unit">{def.unit}</span>}
+        {def.unit && <span className="unit">{t(def.unit)}</span>}
       </div>
     </div>
   );
@@ -130,7 +131,7 @@ export function ColorField({ def, value, onChange, disabled }: FieldProps<ColorP
   return (
     <div className="field">
       <label htmlFor={id} className="field-label">
-        {def.label}
+        {t(def.label)}
       </label>
       <div className="field-input-row">
         <input
@@ -143,7 +144,7 @@ export function ColorField({ def, value, onChange, disabled }: FieldProps<ColorP
         <input
           type="text"
           className="color-text"
-          aria-label={`${def.label}（コード）`}
+          aria-label={t('{0}（コード）', t(def.label))}
           value={value}
           disabled={disabled}
           onChange={(e) => /^#[0-9a-fA-F]{6}$/.test(e.target.value) && onChange(e.target.value)}
@@ -158,7 +159,7 @@ export function TextField({ def, value, onChange, disabled }: FieldProps<TextPar
   return (
     <div className="field">
       <label htmlFor={id} className="field-label">
-        {def.label}
+        {t(def.label)}
       </label>
       {def.multiline ? (
         <textarea
@@ -191,7 +192,7 @@ export function FontField({ def, value, onChange, disabled }: FieldProps<FontPar
     <div className="field">
       <div className="field-label-row">
         <label htmlFor={id} className="field-label">
-          {def.label}
+          {t(def.label)}
         </label>
         {window.queryLocalFonts && !localFontsCache && (
           <button
@@ -209,7 +210,7 @@ export function FontField({ def, value, onChange, disabled }: FieldProps<FontPar
               }
             }}
           >
-            PC のフォントを読み込む
+            {t('PC のフォントを読み込む')}
           </button>
         )}
       </div>
@@ -240,12 +241,12 @@ export function SelectField({
   return (
     <div className="field">
       <label htmlFor={id} className="field-label">
-        {def.label}
+        {t(def.label)}
       </label>
       <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
         {def.options.map((o) => (
           <option key={o.value} value={o.value}>
-            {o.label}
+            {t(o.label)}
           </option>
         ))}
       </select>
@@ -264,11 +265,11 @@ export function SceneField({
   return (
     <div className="field">
       <label htmlFor={id} className="field-label">
-        {def.label}
+        {t(def.label)}
       </label>
       <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
         {!options.some((o) => o.id === value) && (
-          <option value={value}>（選択してください）</option>
+          <option value={value}>{t('（選択してください）')}</option>
         )}
         {options.map((o) => (
           <option key={o.id} value={o.id}>
@@ -289,7 +290,7 @@ export function BoolField({ def, value, onChange, disabled }: FieldProps<BoolPar
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
       />
-      {def.label}
+      {t(def.label)}
     </label>
   );
 }

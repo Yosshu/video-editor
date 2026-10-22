@@ -13,6 +13,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173/video-editor/',
     trace: 'on-first-retry',
+    // 画面の言語はブラウザの言語で決まるので、日本語にそろえる（英語は個別のテストで確認する）
+    locale: 'ja-JP',
   },
   projects: [
     {

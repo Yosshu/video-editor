@@ -1,6 +1,7 @@
 import type { Project } from '../model/types';
 import { projectSchema } from '../schema/projectSchema';
 import { FORMAT_ID, FORMAT_VERSION } from './factory';
+import { t } from '../../i18n';
 
 /** 編集ファイルとして読み込める最大サイズ（文字数） */
 const MAX_FILE_CHARS = 64 * 1024 * 1024;
@@ -25,7 +26,8 @@ export function migrate(data: Record<string, unknown>): Record<string, unknown> 
   let version = Number(current.formatVersion);
   while (version < FORMAT_VERSION) {
     const step = MIGRATIONS[version];
-    if (!step) throw new ProjectFileError(`バージョン ${version} の編集ファイルを変換できません。`);
+    if (!step)
+      throw new ProjectFileError(t('バージョン {0} の編集ファイルを変換できません。', version));
     current = { ...step(current), formatVersion: version + 1 };
     version += 1;
   }
@@ -37,13 +39,13 @@ export function serializeProject(project: Project): string {
 }
 
 export function parseProject(text: string): ParseResult {
-  if (text.length > MAX_FILE_CHARS) throw new ProjectFileError('編集ファイルが大きすぎます。');
+  if (text.length > MAX_FILE_CHARS) throw new ProjectFileError(t('編集ファイルが大きすぎます。'));
   let data: unknown;
   try {
     data = JSON.parse(text);
   } catch {
     throw new ProjectFileError(
-      '編集ファイルを読み取れませんでした（JSON の形式が正しくありません）。',
+      t('編集ファイルを読み取れませんでした（JSON の形式が正しくありません）。'),
     );
   }
   if (
@@ -51,31 +53,33 @@ export function parseProject(text: string): ParseResult {
     data === null ||
     (data as { format?: unknown }).format !== FORMAT_ID
   ) {
-    throw new ProjectFileError('このアプリの編集ファイルではありません。');
+    throw new ProjectFileError(t('このアプリの編集ファイルではありません。'));
   }
   const warnings: string[] = [];
   const version = Number((data as { formatVersion?: unknown }).formatVersion);
   if (!Number.isInteger(version) || version < 1) {
-    throw new ProjectFileError('編集ファイルのバージョンが不正です。');
+    throw new ProjectFileError(t('編集ファイルのバージョンが不正です。'));
   }
   if (version > FORMAT_VERSION) {
     warnings.push(
-      'このファイルは新しいバージョンのアプリで保存されています。一部の内容が正しく表示されない可能性があります。',
+      t(
+        'このファイルは新しいバージョンのアプリで保存されています。一部の内容が正しく表示されない可能性があります。',
+      ),
     );
   }
   const migrated = version < FORMAT_VERSION ? migrate(data as Record<string, unknown>) : data;
   const result = projectSchema.safeParse(migrated);
   if (!result.success) {
     const first = result.error.issues[0];
-    const where = first?.path.join('.') || '(全体)';
+    const where = first?.path.join('.') || t('(全体)');
     throw new ProjectFileError(
-      `編集ファイルの内容が正しくありません：${where} ${first?.message ?? ''}`,
+      t('編集ファイルの内容が正しくありません：{0} {1}', where, first?.message ?? ''),
     );
   }
   const project = result.data as unknown as Project;
   if (!project.scenes.some((s) => s.id === project.rootSceneId)) {
     throw new ProjectFileError(
-      '編集ファイルの内容が正しくありません：メインのシーンが見つかりません。',
+      t('編集ファイルの内容が正しくありません：メインのシーンが見つかりません。'),
     );
   }
   return { project, warnings };

@@ -24,6 +24,7 @@ import { currentScene, getState, notify, useEditor } from '../../../state/store'
 import { closeDialog } from '../../../state/ui';
 import { Dialog } from '../../common/Dialog';
 import { formatBytes } from '../../common/format';
+import { t } from '../../../i18n';
 
 const QUALITIES: { value: QualityLevel; label: string }[] = [
   { value: 'very-high', label: '最高' },
@@ -41,7 +42,7 @@ type Phase =
 
 function formatSeconds(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
-  return s >= 60 ? `${Math.floor(s / 60)}分${s % 60}秒` : `${s}秒`;
+  return s >= 60 ? t('{0}分{1}秒', Math.floor(s / 60), s % 60) : t('{0}秒', s);
 }
 
 export function ExportDialog() {
@@ -120,11 +121,14 @@ export function ExportDialog() {
     } catch (e) {
       if (e instanceof ExportCanceledError) {
         setPhase({ kind: 'settings' });
-        notify('書き出しを中止しました。');
+        notify(t('書き出しを中止しました。'));
       } else {
         console.error(e);
         setPhase({ kind: 'settings' });
-        notify(`書き出しに失敗しました：${e instanceof Error ? e.message : String(e)}`, 'error');
+        notify(
+          t('書き出しに失敗しました：{0}', e instanceof Error ? e.message : String(e)),
+          'error',
+        );
       }
     } finally {
       abortRef.current = null;
@@ -136,13 +140,13 @@ export function ExportDialog() {
     const container = CONTAINERS.find((c) => c.value === format)!;
     const target = await chooseSaveTarget(
       `${baseName()}${container.extension}`,
-      `${container.label} 動画`,
+      t('{0} 動画', container.label),
       container.mime,
       container.extension,
     );
     if (!target) return;
     const { project } = getState();
-    await run('動画を書き出しています', async (signal, onProgress) => {
+    await run(t('動画を書き出しています'), async (signal, onProgress) => {
       const blob = await exportVideo(
         project,
         scene,
@@ -162,17 +166,17 @@ export function ExportDialog() {
       );
       if (blob) {
         deliver(blob, target.name);
-        return `「${target.name}」（${formatBytes(blob.size)}）をダウンロードしました。`;
+        return t('「{0}」（{1}）をダウンロードしました。', target.name, formatBytes(blob.size));
       }
-      return `「${target.name}」に保存しました。`;
+      return t('「{0}」に保存しました。', target.name);
     });
   };
 
   const startWav = async () => {
-    const target = await chooseSaveTarget(`${baseName()}.wav`, 'WAV 音声', 'audio/wav', '.wav');
+    const target = await chooseSaveTarget(`${baseName()}.wav`, t('WAV 音声'), 'audio/wav', '.wav');
     if (!target) return;
     const { project } = getState();
-    await run('音声を書き出しています', async (signal, onProgress) => {
+    await run(t('音声を書き出しています'), async (signal, onProgress) => {
       const parts: Uint8Array[] = [];
       let position = 0;
       const write =
@@ -196,11 +200,11 @@ export function ExportDialog() {
       }
       if (target.kind === 'file') {
         await target.writable.close();
-        return `「${target.name}」に保存しました。`;
+        return t('「{0}」に保存しました。', target.name);
       }
       const blob = new Blob(parts as BlobPart[], { type: 'audio/wav' });
       deliver(blob, target.name);
-      return `「${target.name}」（${formatBytes(blob.size)}）をダウンロードしました。`;
+      return t('「{0}」（{1}）をダウンロードしました。', target.name, formatBytes(blob.size));
     });
   };
 
@@ -209,26 +213,26 @@ export function ExportDialog() {
     const frame = state.playhead;
     const target = await chooseSaveTarget(
       `${baseName()}_${frame}.png`,
-      'PNG 画像',
+      t('PNG 画像'),
       'image/png',
       '.png',
     );
     if (!target) return;
-    await run('静止画を保存しています', async () => {
+    await run(t('静止画を保存しています'), async () => {
       const blob = await renderStill(state.project, scene, frame);
       if (target.kind === 'file') {
         await target.writable.write(blob);
         await target.writable.close();
-        return `「${target.name}」に保存しました。`;
+        return t('「{0}」に保存しました。', target.name);
       }
       deliver(blob, target.name);
-      return `「${target.name}」をダウンロードしました。`;
+      return t('「{0}」をダウンロードしました。', target.name);
     });
   };
 
   const close = () => {
     if (running) {
-      if (!window.confirm('書き出しを中止しますか？')) return;
+      if (!window.confirm(t('書き出しを中止しますか？'))) return;
       abortRef.current?.abort();
       return;
     }
@@ -241,7 +245,7 @@ export function ExportDialog() {
 
   return (
     <Dialog
-      title="書き出し"
+      title={t('書き出し')}
       onClose={close}
       modal={running}
       width={540}
@@ -251,16 +255,16 @@ export function ExportDialog() {
             <button
               type="button"
               onClick={() => void saveStill()}
-              title="再生位置のフレームを PNG で保存"
+              title={t('再生位置のフレームを PNG で保存')}
             >
-              静止画（PNG）
+              {t('静止画（PNG）')}
             </button>
             <button type="button" onClick={() => void startWav()} disabled={duration === 0}>
-              音声のみ（WAV）
+              {t('音声のみ（WAV）')}
             </button>
             <span className="spacer" />
             <button type="button" onClick={close}>
-              閉じる
+              {t('閉じる')}
             </button>
             <button
               type="button"
@@ -268,23 +272,23 @@ export function ExportDialog() {
               disabled={!vCodec || end <= start}
               onClick={() => void startVideo()}
             >
-              書き出し開始
+              {t('書き出し開始')}
             </button>
           </>
         ) : phase.kind === 'running' ? (
           <button type="button" onClick={() => abortRef.current?.abort()}>
-            中止
+            {t('中止')}
           </button>
         ) : (
           <button type="button" className="primary" onClick={closeDialog}>
-            閉じる
+            {t('閉じる')}
           </button>
         )
       }
     >
       {phase.kind === 'settings' && (
         <div className="form-grid">
-          <label htmlFor="ex-format">形式</label>
+          <label htmlFor="ex-format">{t('形式')}</label>
           <select
             id="ex-format"
             value={format}
@@ -296,32 +300,32 @@ export function ExportDialog() {
                 value={c.value}
                 disabled={!!support && support.video[c.value].length === 0}
               >
-                {c.label}
+                {t(c.label)}
               </option>
             ))}
           </select>
-          <label htmlFor="ex-vcodec">映像</label>
+          <label htmlFor="ex-vcodec">{t('映像')}</label>
           <select
             id="ex-vcodec"
             value={vCodec ?? ''}
             onChange={(e) => setVideoCodec(e.target.value as VideoCodec)}
             disabled={!support}
           >
-            {!support && <option>確認中…</option>}
+            {!support && <option>{t('確認中…')}</option>}
             {support && videoOptions.length === 0 && (
-              <option value="">この環境では使えません</option>
+              <option value="">{t('この環境では使えません')}</option>
             )}
             {videoOptions.map((c) => (
               <option key={c.value} value={c.value}>
-                {c.label}
+                {t(c.label)}
               </option>
             ))}
           </select>
-          <label htmlFor="ex-acodec">音声</label>
+          <label htmlFor="ex-acodec">{t('音声')}</label>
           <div className="inline">
             <input
               type="checkbox"
-              aria-label="音声を含める"
+              aria-label={t('音声を含める')}
               checked={withAudio}
               onChange={(e) => setWithAudio(e.target.checked)}
             />
@@ -332,25 +336,25 @@ export function ExportDialog() {
               disabled={!withAudio || !support}
             >
               {support && audioOptions.length === 0 && (
-                <option value="">この環境では使えません</option>
+                <option value="">{t('この環境では使えません')}</option>
               )}
               {audioOptions.map((c) => (
                 <option key={c.value} value={c.value}>
-                  {c.label}
+                  {t(c.label)}
                 </option>
               ))}
             </select>
           </div>
-          <label htmlFor="ex-size">解像度</label>
+          <label htmlFor="ex-size">{t('解像度')}</label>
           <select id="ex-size" value={scale} onChange={(e) => setScale(Number(e.target.value))}>
             {SCALES.map((s) => (
               <option key={s} value={s}>
                 {evenSize(scene.width * s)} × {evenSize(scene.height * s)}
-                {s === 1 ? '（そのまま）' : `（${s * 100}%）`}
+                {s === 1 ? t('（そのまま）') : `（${s * 100}%）`}
               </option>
             ))}
           </select>
-          <label htmlFor="ex-quality">画質</label>
+          <label htmlFor="ex-quality">{t('画質')}</label>
           <select
             id="ex-quality"
             value={quality}
@@ -358,11 +362,11 @@ export function ExportDialog() {
           >
             {QUALITIES.map((q) => (
               <option key={q.value} value={q.value}>
-                {q.label}
+                {t(q.label)}
               </option>
             ))}
           </select>
-          <span>範囲</span>
+          <span>{t('範囲')}</span>
           <div className="range-options">
             <label>
               <input
@@ -371,7 +375,7 @@ export function ExportDialog() {
                 checked={rangeMode === 'all'}
                 onChange={() => setRangeMode('all')}
               />
-              全体（{formatTimecode(duration, settings.fps)}）
+              {t('全体（{0}）', formatTimecode(duration, settings.fps))}
             </label>
             <label>
               <input
@@ -380,13 +384,13 @@ export function ExportDialog() {
                 checked={rangeMode === 'custom'}
                 onChange={() => setRangeMode('custom')}
               />
-              指定
+              {t('指定')}
             </label>
             {rangeMode === 'custom' && (
               <div className="inline">
                 <input
                   type="number"
-                  aria-label="開始フレーム"
+                  aria-label={t('開始フレーム')}
                   min={0}
                   max={duration}
                   value={rangeStart}
@@ -395,22 +399,24 @@ export function ExportDialog() {
                 <span>〜</span>
                 <input
                   type="number"
-                  aria-label="終了フレーム"
+                  aria-label={t('終了フレーム')}
                   min={0}
                   max={duration}
                   value={rangeEnd}
                   onChange={(e) => setRangeEnd(Number(e.target.value))}
                 />
-                <span className="dim">フレーム</span>
+                <span className="dim">{t('フレーム')}</span>
               </div>
             )}
           </div>
           {duration === 0 && (
-            <p className="hint form-wide">タイムラインにオブジェクトがありません。</p>
+            <p className="hint form-wide">{t('タイムラインにオブジェクトがありません。')}</p>
           )}
           {!window.showSaveFilePicker && (
             <p className="hint form-wide">
-              このブラウザではファイルを直接保存できないため、書き出し後にダウンロードします（長い動画はメモリを多く使います）。
+              {t(
+                'このブラウザではファイルを直接保存できないため、書き出し後にダウンロードします（長い動画はメモリを多く使います）。',
+              )}
             </p>
           )}
         </div>
@@ -418,10 +424,10 @@ export function ExportDialog() {
       {phase.kind === 'running' && (
         <div className="export-progress">
           <p>{phase.label}…</p>
-          <progress value={ratio} max={1} aria-label="進捗" />
+          <progress value={ratio} max={1} aria-label={t('進捗')} />
           <p className="dim">
             {Math.floor(ratio * 100)}%{progress ? `（${progress.done} / ${progress.total}）` : ''}
-            {remaining !== null ? ` ・ 残り約 ${formatSeconds(remaining)}` : ''}
+            {remaining !== null ? t(' ・ 残り約 {0}', formatSeconds(remaining)) : ''}
           </p>
         </div>
       )}

@@ -3,6 +3,7 @@ import { newId } from '../core/model/ids';
 import type { BeatGrid, Scene } from '../core/model/types';
 import { neighborMarker } from '../core/timeline/markers';
 import { commit, currentScene, getState, setPlayhead } from '../state/store';
+import { t } from '../i18n';
 
 function editScene(label: string, fn: (scene: Draft<Scene>) => void, mergeKey?: string): void {
   const { sceneId } = getState();
@@ -20,7 +21,7 @@ function editScene(label: string, fn: (scene: Draft<Scene>) => void, mergeKey?: 
 export function addMarker(frame: number, label?: string): void {
   const f = Math.max(0, Math.round(frame));
   if (currentScene().markers?.some((m) => m.frame === f)) return;
-  editScene('マーカーの追加', (s) => {
+  editScene(t('マーカーの追加'), (s) => {
     s.markers ??= [];
     s.markers.push({ id: newId('mk'), frame: f, ...(label ? { label } : {}) });
     s.markers.sort((a, b) => a.frame - b.frame);
@@ -32,7 +33,7 @@ export function addMarkerAtPlayhead(): void {
 }
 
 export function moveMarker(id: string, frame: number): void {
-  editScene('マーカーの移動', (s) => {
+  editScene(t('マーカーの移動'), (s) => {
     const m = s.markers?.find((x) => x.id === id);
     if (!m) return;
     m.frame = Math.max(0, Math.round(frame));
@@ -41,7 +42,7 @@ export function moveMarker(id: string, frame: number): void {
 }
 
 export function updateMarker(id: string, patch: { label?: string; color?: string }): void {
-  editScene('マーカーの変更', (s) => {
+  editScene(t('マーカーの変更'), (s) => {
     const m = s.markers?.find((x) => x.id === id);
     if (!m) return;
     if (patch.label !== undefined) {
@@ -53,7 +54,7 @@ export function updateMarker(id: string, patch: { label?: string; color?: string
 }
 
 export function removeMarker(id: string): void {
-  editScene('マーカーの削除', (s) => {
+  editScene(t('マーカーの削除'), (s) => {
     s.markers = s.markers?.filter((m) => m.id !== id);
     if (s.markers?.length === 0) delete s.markers;
   });
@@ -68,7 +69,7 @@ export function jumpToMarker(direction: -1 | 1): void {
 /** BPM グリッドを変更する（null で削除） */
 export function setBeatGrid(grid: BeatGrid | null): void {
   editScene(
-    'BPM グリッドの変更',
+    t('BPM グリッドの変更'),
     (s) => {
       if (grid) s.beatGrid = grid;
       else delete s.beatGrid;

@@ -20,6 +20,7 @@ import { getState, redo, setSelection, undo } from '../../state/store';
 import { openDialog, useUi } from '../../state/ui';
 import { togglePreviewFullscreen } from '../preview/fullscreen';
 import { zoomTimeline } from '../timeline/zoom';
+import { t } from '../../i18n';
 
 /**
  * キーボードで実行できるコマンド。キーは「Ctrl+Shift+KeyS」のように、修飾キー（Ctrl・Alt・Shift の順）と
@@ -286,11 +287,11 @@ export function formatKey(key: string): string {
     .split('+')
     .map(
       (p) =>
-        KEY_NAMES[p] ??
+        (KEY_NAMES[p] !== undefined ? t(KEY_NAMES[p]) : undefined) ??
         p
           .replace(/^Key/, '')
           .replace(/^Digit/, '')
-          .replace(/^Numpad/, 'テンキー '),
+          .replace(/^Numpad/, t('テンキー ')),
     )
     .join(' + ');
 }

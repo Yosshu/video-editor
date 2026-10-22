@@ -5,6 +5,7 @@ import { RESOLUTION_PRESETS } from '../../../core/project/factory';
 import { useEditor } from '../../../state/store';
 import { closeDialog } from '../../../state/ui';
 import { Dialog } from '../../common/Dialog';
+import { t } from '../../../i18n';
 
 /** プロジェクトの設定。解像度・フレームレート・サンプリングレートは「適用」で反映する */
 export function ProjectSettingsDialog() {
@@ -30,7 +31,9 @@ export function ProjectSettingsDialog() {
     if (
       fpsChanged &&
       !window.confirm(
-        'フレームレートを変えると、すべてのオブジェクトの位置と長さ・キーフレーム・マーカーを新しいフレームレートに換算します（元に戻すこともできます）。変更しますか？',
+        t(
+          'フレームレートを変えると、すべてのオブジェクトの位置と長さ・キーフレーム・マーカーを新しいフレームレートに換算します（元に戻すこともできます）。変更しますか？',
+        ),
       )
     )
       return;
@@ -45,21 +48,21 @@ export function ProjectSettingsDialog() {
 
   return (
     <Dialog
-      title="プロジェクトの設定"
+      title={t('プロジェクトの設定')}
       onClose={closeDialog}
       footer={
         <>
           <button type="button" onClick={closeDialog}>
-            {changed ? 'キャンセル' : '閉じる'}
+            {changed ? t('キャンセル') : t('閉じる')}
           </button>
           <button type="button" className="primary" disabled={!changed || !valid} onClick={apply}>
-            適用
+            {t('適用')}
           </button>
         </>
       }
     >
       <div className="form-grid">
-        <label htmlFor="ps-preset">解像度</label>
+        <label htmlFor="ps-preset">{t('解像度')}</label>
         <select
           id="ps-preset"
           value={`${width}x${height}`}
@@ -73,14 +76,14 @@ export function ProjectSettingsDialog() {
         >
           {RESOLUTION_PRESETS.map((p) => (
             <option key={p.label} value={`${p.width}x${p.height}`}>
-              {p.label}
+              {t(p.label)}
             </option>
           ))}
           {!RESOLUTION_PRESETS.some((p) => p.width === width && p.height === height) && (
-            <option value={`${width}x${height}`}>カスタム</option>
+            <option value={`${width}x${height}`}>{t('カスタム')}</option>
           )}
         </select>
-        <label htmlFor="ps-width">幅 × 高さ</label>
+        <label htmlFor="ps-width">{t('幅 × 高さ')}</label>
         <div className="inline">
           <input
             id="ps-width"
@@ -92,7 +95,7 @@ export function ProjectSettingsDialog() {
           />
           <span>×</span>
           <input
-            aria-label="高さ"
+            aria-label={t('高さ')}
             type="number"
             min={16}
             max={8192}
@@ -101,20 +104,20 @@ export function ProjectSettingsDialog() {
           />
           <span>px</span>
         </div>
-        <label htmlFor="ps-fps">フレームレート</label>
+        <label htmlFor="ps-fps">{t('フレームレート')}</label>
         <select id="ps-fps" value={fpsLabel} onChange={(e) => setFpsLabel(e.target.value)}>
           {currentFps === 'current' && (
             <option value="current">
-              {Math.round(fpsValue(settings.fps) * 1000) / 1000} fps（現在）
+              {t('{0} fps（現在）', Math.round(fpsValue(settings.fps) * 1000) / 1000)}
             </option>
           )}
           {FPS_PRESETS.map((p) => (
             <option key={p.label} value={p.label}>
-              {p.label} fps
+              {t(p.label)} fps
             </option>
           ))}
         </select>
-        <label htmlFor="ps-rate">音声サンプリングレート</label>
+        <label htmlFor="ps-rate">{t('音声サンプリングレート')}</label>
         <select
           id="ps-rate"
           value={sampleRate}
@@ -123,7 +126,7 @@ export function ProjectSettingsDialog() {
           <option value={44100}>44100 Hz</option>
           <option value={48000}>48000 Hz</option>
         </select>
-        <label htmlFor="ps-bg">背景色</label>
+        <label htmlFor="ps-bg">{t('背景色')}</label>
         <input
           id="ps-bg"
           type="color"
@@ -132,7 +135,9 @@ export function ProjectSettingsDialog() {
         />
       </div>
       <p className="hint">
-        解像度を変えても、オブジェクトの位置（画面の中央が原点）と大きさはそのままです。背景色はすぐに反映されます。
+        {t(
+          '解像度を変えても、オブジェクトの位置（画面の中央が原点）と大きさはそのままです。背景色はすぐに反映されます。',
+        )}
       </p>
     </Dialog>
   );

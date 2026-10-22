@@ -10,6 +10,7 @@ import { closeDialog } from '../../../state/ui';
 import { pickFilesWithInput } from '../../../storage/filePicker';
 import { Dialog } from '../../common/Dialog';
 import { formatBytes } from '../../common/format';
+import { t } from '../../../i18n';
 
 async function pickFiles(directory: boolean): Promise<IncomingFile[]> {
   const files = await pickFilesWithInput({ multiple: true, directory });
@@ -29,7 +30,7 @@ export function MissingAssetsDialog() {
     try {
       const n = await relinkFiles(files);
       notify(
-        n > 0 ? `${n} 個の素材を見つけました。` : '一致する素材が見つかりませんでした。',
+        n > 0 ? t('{0} 個の素材を見つけました。', n) : t('一致する素材が見つかりませんでした。'),
         n > 0 ? 'info' : 'error',
       );
     } finally {
@@ -41,7 +42,7 @@ export function MissingAssetsDialog() {
 
   return (
     <Dialog
-      title="見つからない素材があります"
+      title={t('見つからない素材があります')}
       onClose={closeDialog}
       width={560}
       footer={
@@ -50,16 +51,18 @@ export function MissingAssetsDialog() {
           className={missing.length === 0 ? 'primary' : ''}
           onClick={closeDialog}
         >
-          {missing.length === 0 ? '完了' : 'あとで'}
+          {missing.length === 0 ? t('完了') : t('あとで')}
         </button>
       }
     >
       {missing.length === 0 ? (
-        <p>すべての素材が見つかりました。</p>
+        <p>{t('すべての素材が見つかりました。')}</p>
       ) : (
         <>
           <p>
-            ブラウザはファイルの場所を覚えられないため、素材ファイルをもう一度指定してください。フォルダごと指定すると、ファイル名と内容から自動で探します。
+            {t(
+              'ブラウザはファイルの場所を覚えられないため、素材ファイルをもう一度指定してください。フォルダごと指定すると、ファイル名と内容から自動で探します。',
+            )}
           </p>
           <ul className="missing-list">
             {missing.map((a) => (
@@ -84,7 +87,7 @@ export function MissingAssetsDialog() {
               void collectDroppedFiles(e.dataTransfer).then(handleFiles);
             }}
           >
-            {busy ? '照合しています…' : 'ここに素材ファイルをドロップ'}
+            {busy ? t('照合しています…') : t('ここに素材ファイルをドロップ')}
           </div>
           <div className="button-row">
             <button
@@ -92,14 +95,14 @@ export function MissingAssetsDialog() {
               disabled={busy}
               onClick={() => void pickFiles(false).then(handleFiles)}
             >
-              ファイルを選択…
+              {t('ファイルを選択…')}
             </button>
             <button
               type="button"
               disabled={busy}
               onClick={() => void pickFiles(true).then(handleFiles)}
             >
-              フォルダを選択…
+              {t('フォルダを選択…')}
             </button>
             {supportsHandles && (
               <button
@@ -109,13 +112,13 @@ export function MissingAssetsDialog() {
                   setBusy(true);
                   try {
                     const n = await requestStoredHandles();
-                    if (n === 0) notify('ブラウザに記録された素材はありませんでした。', 'error');
+                    if (n === 0) notify(t('ブラウザに記録された素材はありませんでした。'), 'error');
                   } finally {
                     setBusy(false);
                   }
                 }}
               >
-                前回のファイルへのアクセスを許可
+                {t('前回のファイルへのアクセスを許可')}
               </button>
             )}
           </div>

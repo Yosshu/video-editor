@@ -3,6 +3,7 @@ import { computeFingerprint } from '../engine/media/fingerprint';
 import { AssetImportError, assetRegistry } from '../engine/media/registry';
 import { idbGet, idbSet } from '../storage/idb';
 import { commit, getState, notify, setAssetStatus } from '../state/store';
+import { t } from '../i18n';
 
 export interface IncomingFile {
   file: File;
@@ -78,7 +79,7 @@ export async function importMediaFiles(files: IncomingFile[]): Promise<Asset[]> 
         continue;
       }
       const asset = await assetRegistry.importFile(file);
-      commit('素材の追加', (draft) => {
+      commit(t('素材の追加'), (draft) => {
         draft.assets.push(asset);
       });
       setAssetStatus(asset.id, 'ready');
@@ -86,7 +87,7 @@ export async function importMediaFiles(files: IncomingFile[]): Promise<Asset[]> 
       result.push(asset);
     } catch (e) {
       const message =
-        e instanceof AssetImportError ? e.message : `「${file.name}」を読み込めませんでした。`;
+        e instanceof AssetImportError ? e.message : t('「{0}」を読み込めませんでした。', file.name);
       notify(message, 'error');
       console.error(e);
     }
@@ -178,7 +179,7 @@ export async function relinkFiles(files: IncomingFile[]): Promise<number> {
       remaining.delete(asset.id);
     } catch (e) {
       setAssetStatus(asset.id, 'error');
-      notify(`「${asset.name}」を読み込めませんでした。`, 'error');
+      notify(t('「{0}」を読み込めませんでした。', asset.name), 'error');
       console.error(e);
     }
   };
@@ -211,7 +212,7 @@ async function attachAndUpdate(
   await assetRegistry.attach(asset, incoming.file);
   setAssetStatus(asset.id, 'ready');
   if (fingerprint && fingerprint !== asset.fingerprint) {
-    commit('素材の差し替え', (draft) => {
+    commit(t('素材の差し替え'), (draft) => {
       const a = draft.assets.find((x) => x.id === asset.id);
       if (!a) return;
       a.name = incoming.file.name;

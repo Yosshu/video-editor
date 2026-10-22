@@ -14,6 +14,7 @@ import { commit, currentScene, getState, notify, useEditor } from '../../state/s
 import { openContextMenu, openDialog } from '../../state/ui';
 import { formatBytes, formatDuration } from '../common/format';
 import { useThumbnail } from '../common/mediaHooks';
+import { t } from '../../i18n';
 
 export const ASSET_DRAG_TYPE = 'application/x-ved-asset';
 
@@ -32,7 +33,7 @@ async function pickMediaFiles(multiple = true): Promise<IncomingFile[]> {
         id: 'media',
         types: [
           {
-            description: '動画・画像・音声',
+            description: t('動画・画像・音声'),
             accept: { 'video/*': [], 'image/*': [], 'audio/*': [] },
           },
         ],
@@ -60,18 +61,18 @@ function addToTimeline(asset: Asset): void {
 }
 
 function describe(asset: Asset): string {
-  const parts: string[] = [KIND_LABEL[asset.kind]];
+  const parts: string[] = [t(KIND_LABEL[asset.kind])];
   if (asset.width && asset.height) parts.push(`${asset.width}×${asset.height}`);
   if (asset.durationSec) parts.push(formatDuration(asset.durationSec));
   parts.push(formatBytes(asset.size));
-  return parts.join(' ・ ');
+  return parts.join(t(' ・ '));
 }
 
 function AssetThumb({ asset }: { asset: Asset }) {
   const url = useThumbnail(asset.kind === 'audio' ? undefined : asset.id);
   return (
     <span className="asset-kind" style={url ? { backgroundImage: `url(${url})` } : undefined}>
-      {url ? '' : KIND_LABEL[asset.kind]}
+      {url ? '' : t(KIND_LABEL[asset.kind])}
     </span>
   );
 }
@@ -97,10 +98,10 @@ export function MediaBin() {
       s.objects.some((o) => o.assetId === asset.id),
     );
     if (used) {
-      notify('タイムラインで使われている素材は削除できません。', 'error');
+      notify(t('タイムラインで使われている素材は削除できません。'), 'error');
       return;
     }
-    commit('素材の削除', (draft) => {
+    commit(t('素材の削除'), (draft) => {
       draft.assets = draft.assets.filter((a) => a.id !== asset.id);
     });
   };
@@ -108,7 +109,7 @@ export function MediaBin() {
   return (
     <section
       className={`panel media-bin ${over ? 'drag-over' : ''}`}
-      aria-label="素材一覧"
+      aria-label={t('素材一覧')}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
@@ -125,19 +126,19 @@ export function MediaBin() {
       }}
     >
       <header className="panel-header">
-        <h2>素材</h2>
+        <h2>{t('素材')}</h2>
         <button
           type="button"
           onClick={() => void pickMediaFiles().then(importFiles)}
           disabled={busy}
         >
-          {busy ? '読み込み中…' : '追加…'}
+          {busy ? t('読み込み中…') : t('追加…')}
         </button>
       </header>
       <div className="panel-body">
         {assets.length === 0 ? (
           <p className="empty-hint">
-            動画・画像・音声ファイルをここにドロップするか、「追加…」から選んでください。
+            {t('動画・画像・音声ファイルをここにドロップするか、「追加…」から選んでください。')}
           </p>
         ) : (
           <ul className="asset-list">
@@ -149,7 +150,7 @@ export function MediaBin() {
                   key={asset.id}
                   className={`asset-item kind-${asset.kind} ${missing ? 'missing' : ''}`}
                   draggable={!missing}
-                  title={`${asset.name}\n${describe(asset)}${missing ? '\n（ファイルが見つかりません）' : ''}`}
+                  title={`${asset.name}\n${describe(asset)}${missing ? t('\n（ファイルが見つかりません）') : ''}`}
                   onDragStart={(e) => {
                     e.dataTransfer.setData(ASSET_DRAG_TYPE, asset.id);
                     e.dataTransfer.effectAllowed = 'copy';
@@ -159,24 +160,27 @@ export function MediaBin() {
                     e.preventDefault();
                     openContextMenu(e.clientX, e.clientY, [
                       {
-                        label: 'タイムラインに追加',
+                        label: t('タイムラインに追加'),
                         disabled: missing,
                         action: () => addToTimeline(asset),
                       },
                       {
-                        label: 'ファイルを指定し直す…',
+                        label: t('ファイルを指定し直す…'),
                         action: () =>
                           void pickMediaFiles(false).then(async ([incoming]) => {
                             if (!incoming) return;
                             try {
                               await replaceAssetFile(asset, incoming);
                             } catch {
-                              notify(`「${incoming.file.name}」を読み込めませんでした。`, 'error');
+                              notify(
+                                t('「{0}」を読み込めませんでした。', incoming.file.name),
+                                'error',
+                              );
                             }
                           }),
                       },
                       'separator',
-                      { label: '素材を削除', action: () => removeAsset(asset) },
+                      { label: t('素材を削除'), action: () => removeAsset(asset) },
                     ]);
                   }}
                 >
@@ -184,9 +188,9 @@ export function MediaBin() {
                   <span className="asset-name">{asset.name}</span>
                   <span className="asset-meta">
                     {missing
-                      ? 'ファイルが見つかりません'
+                      ? t('ファイルが見つかりません')
                       : st === 'loading'
-                        ? '読み込み中…'
+                        ? t('読み込み中…')
                         : describe(asset)}
                   </span>
                 </li>
@@ -200,7 +204,7 @@ export function MediaBin() {
             className="warning-button"
             onClick={() => openDialog({ type: 'missingAssets' })}
           >
-            見つからない素材を指定する…
+            {t('見つからない素材を指定する…')}
           </button>
         )}
       </div>

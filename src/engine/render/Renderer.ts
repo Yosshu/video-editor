@@ -22,6 +22,7 @@ import {
   type Vec3,
 } from './gl';
 import { RenderTargetPool } from './targetPool';
+import { t } from '../../i18n';
 
 /** カメラ（カメラ制御） */
 export interface CameraView {
@@ -231,7 +232,7 @@ export class Renderer {
       premultipliedAlpha: true,
       preserveDrawingBuffer: true,
     }) as WebGL2RenderingContext | null;
-    if (!gl) throw new Error('WebGL2 を初期化できませんでした');
+    if (!gl) throw new Error(t('WebGL2 を初期化できませんでした'));
     this.gl = gl;
     this.quadProgram = createProgram(gl, QUAD_VS, QUAD_FS, [
       'uMatrix',
@@ -248,7 +249,7 @@ export class Renderer {
     this.presentProgram = createProgram(gl, PRESENT_VS, PRESENT_FS, ['uTex']);
     const vao = gl.createVertexArray();
     const buffer = gl.createBuffer();
-    if (!vao || !buffer) throw new Error('頂点バッファを作成できません');
+    if (!vao || !buffer) throw new Error(t('頂点バッファを作成できません'));
     this.vao = vao;
     gl.bindVertexArray(vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -320,7 +321,7 @@ export class Renderer {
     if (cached && cached.version === item.version) return cached;
     if (!cached) {
       const texture = gl.createTexture();
-      if (!texture) throw new Error('テクスチャを作成できません');
+      if (!texture) throw new Error(t('テクスチャを作成できません'));
       cached = { texture, version: undefined };
       this.textures.set(item.key, cached);
     }

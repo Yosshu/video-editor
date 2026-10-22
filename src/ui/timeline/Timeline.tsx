@@ -65,6 +65,7 @@ import {
   MIN_PX_PER_FRAME,
   RULER_H,
 } from './geometry';
+import { t } from '../../i18n';
 
 const EDGE_PX = 6;
 const SNAP_PX = 8;
@@ -81,19 +82,19 @@ interface Viewport {
 function objectLabel(obj: TimelineObject, assets: Asset[], scenes: Scene[]): string {
   if (obj.type === 'scene') {
     const name = scenes.find((s) => s.id === obj.params.sceneRef)?.name;
-    return name ? `シーン：${name}` : 'シーン（未選択）';
+    return name ? t('シーン：{0}', name) : t('シーン（未選択）');
   }
   if (obj.type === 'filter') {
-    const names = obj.effects.map((e) => getEffectDef(e.type)?.label ?? e.type);
-    return names.length > 0 ? `フィルタ：${names.join('・')}` : 'フィルタ';
+    const names = obj.effects.map((e) => t(getEffectDef(e.type)?.label ?? e.type));
+    return names.length > 0 ? t('フィルタ：{0}', names.join(t('・'))) : t('フィルタ');
   }
   if (obj.type === 'audioWave')
-    return `音声波形（レイヤー ${Number(obj.params.targetLayer ?? 1)} の音）`;
+    return t('音声波形（レイヤー {0} の音）', Number(obj.params.targetLayer ?? 1));
   if (obj.type === 'text')
-    return String(obj.params.text ?? 'テキスト').split('\n')[0] || 'テキスト';
+    return String(obj.params.text ?? t('テキスト')).split('\n')[0] || t('テキスト');
   if (obj.assetId)
-    return assets.find((a) => a.id === obj.assetId)?.name ?? getObjectDef(obj.type).label;
-  return getObjectDef(obj.type).label;
+    return assets.find((a) => a.id === obj.assetId)?.name ?? t(getObjectDef(obj.type).label);
+  return t(getObjectDef(obj.type).label);
 }
 
 /** 再生位置を移動する（再生中なら移動先から再生し直す） */
@@ -149,7 +150,7 @@ const ObjectItem = memo(function ObjectItem({
         backgroundImage: thumb ? `url(${thumb})` : undefined,
         backgroundPosition: thumb ? '3px center' : undefined,
       }}
-      title={`${def.label}：${label}`}
+      title={`${t(def.label)}：${label}`}
     >
       {peaks && (
         <Waveform
@@ -167,15 +168,15 @@ const ObjectItem = memo(function ObjectItem({
       {!ghost &&
         width > 24 &&
         objectKeyTimes(obj)
-          .filter((t) => t > 0)
-          .map((t) => (
+          .filter((k) => k > 0)
+          .map((k) => (
             <span
-              key={t}
+              key={k}
               className="tl-key"
-              data-key-time={t}
+              data-key-time={k}
               data-object-id={obj.id}
-              style={{ left: t * ppf }}
-              title={`中間点（${t} フレーム目）：ドラッグで移動、クリックでその時刻へ`}
+              style={{ left: k * ppf }}
+              title={t('中間点（{0} フレーム目）：ドラッグで移動、クリックでその時刻へ', k)}
             />
           ))}
     </div>
@@ -235,8 +236,8 @@ function Ruler({
           Math.round((e.clientX - e.currentTarget.getBoundingClientRect().left) / ppf),
         );
         openContextMenu(e.clientX, e.clientY, [
-          { label: 'ここにマーカーを追加', action: () => addMarker(frame) },
-          { label: 'BPM グリッドの設定…', action: () => openDialog({ type: 'beatGrid' }) },
+          { label: t('ここにマーカーを追加'), action: () => addMarker(frame) },
+          { label: t('BPM グリッドの設定…'), action: () => openDialog({ type: 'beatGrid' }) },
         ]);
       }}
       data-testid="timeline-ruler"
@@ -254,12 +255,15 @@ function LayerHeaders({ scene, rows }: { scene: Scene; rows: number[] }) {
         const st = scene.layers.find((l) => l.index === i);
         const header = foldHeaderOf(scene.layers, i);
         const rename = () => {
-          const name = window.prompt(`レイヤー ${i} の名前`, st?.name ?? '');
+          const name = window.prompt(t('レイヤー {0} の名前', i), st?.name ?? '');
           if (name !== null) updateLayer(i, { name: name.trim() });
         };
         const makeFold = () => {
           const input = window.prompt(
-            `レイヤー ${i} の下の何レイヤーをまとめますか？（まとめるとタイムラインで折りたためます）`,
+            t(
+              'レイヤー {0} の下の何レイヤーをまとめますか？（まとめるとタイムラインで折りたためます）',
+              i,
+            ),
             String(st?.fold ?? 3),
           );
           if (input === null) return;
@@ -277,31 +281,31 @@ function LayerHeaders({ scene, rows }: { scene: Scene; rows: number[] }) {
             onContextMenu={(e) => {
               e.preventDefault();
               openContextMenu(e.clientX, e.clientY, [
-                { label: '名前を変更…', action: rename },
+                { label: t('名前を変更…'), action: rename },
                 {
-                  label: st?.hidden ? '表示する' : '非表示にする',
+                  label: st?.hidden ? t('表示する') : t('非表示にする'),
                   action: () => updateLayer(i, { hidden: !st?.hidden }),
                 },
                 {
-                  label: st?.locked ? 'ロックを解除' : 'ロックする',
+                  label: st?.locked ? t('ロックを解除') : t('ロックする'),
                   action: () => updateLayer(i, { locked: !st?.locked }),
                 },
                 'separator',
-                { label: 'この位置にレイヤーを挿入', action: () => insertLayerAt(i) },
-                { label: 'このレイヤーを削除（中身ごと）', action: () => deleteLayerAt(i) },
-                { label: 'レイヤーの空白をすべて詰める', action: () => packLayerAt(i) },
+                { label: t('この位置にレイヤーを挿入'), action: () => insertLayerAt(i) },
+                { label: t('このレイヤーを削除（中身ごと）'), action: () => deleteLayerAt(i) },
+                { label: t('レイヤーの空白をすべて詰める'), action: () => packLayerAt(i) },
                 'separator',
                 {
-                  label: st?.fold ? 'まとめるレイヤー数を変更…' : '下のレイヤーとまとめる…',
+                  label: st?.fold ? t('まとめるレイヤー数を変更…') : t('下のレイヤーとまとめる…'),
                   action: makeFold,
                 },
                 ...(st?.fold
                   ? [
                       {
-                        label: st.collapsed ? 'まとまりを開く' : 'まとまりを折りたたむ',
+                        label: st.collapsed ? t('まとまりを開く') : t('まとまりを折りたたむ'),
                         action: () => toggleLayerCollapsed(i),
                       },
-                      { label: 'まとまりを解除', action: () => setLayerFold(i, 0) },
+                      { label: t('まとまりを解除'), action: () => setLayerFold(i, 0) },
                     ]
                   : []),
               ]);
@@ -311,8 +315,12 @@ function LayerHeaders({ scene, rows }: { scene: Scene; rows: number[] }) {
               <button
                 type="button"
                 className="layer-fold"
-                title={st.collapsed ? 'まとまりを開く' : 'まとまりを折りたたむ'}
-                aria-label={`レイヤー ${i} のまとまりを${st.collapsed ? '開く' : '折りたたむ'}`}
+                title={st.collapsed ? t('まとまりを開く') : t('まとまりを折りたたむ')}
+                aria-label={t(
+                  'レイヤー {0} のまとまりを{1}',
+                  i,
+                  st.collapsed ? t('開く') : t('折りたたむ'),
+                )}
                 aria-expanded={!st.collapsed}
                 onClick={() => toggleLayerCollapsed(i)}
               >
@@ -322,8 +330,8 @@ function LayerHeaders({ scene, rows }: { scene: Scene; rows: number[] }) {
             <button
               type="button"
               className={`layer-toggle ${st?.hidden ? 'off' : ''}`}
-              title={st?.hidden ? '表示する' : '非表示にする'}
-              aria-label={`レイヤー ${i} の表示切り替え`}
+              title={st?.hidden ? t('表示する') : t('非表示にする')}
+              aria-label={t('レイヤー {0} の表示切り替え', i)}
               onClick={() => updateLayer(i, { hidden: !st?.hidden })}
             >
               {st?.hidden ? '○' : '●'}
@@ -332,15 +340,15 @@ function LayerHeaders({ scene, rows }: { scene: Scene; rows: number[] }) {
               {st?.name || `Layer ${i}`}
             </span>
             {st?.fold && st.collapsed ? (
-              <span className="fold-count" title={`${st.fold} レイヤーを折りたたみ中`}>
+              <span className="fold-count" title={t('{0} レイヤーを折りたたみ中', st.fold)}>
                 +{st.fold}
               </span>
             ) : null}
             <button
               type="button"
               className={`layer-toggle ${st?.locked ? 'on' : 'off'}`}
-              title={st?.locked ? 'ロックを解除' : 'ロックする'}
-              aria-label={`レイヤー ${i} のロック切り替え`}
+              title={st?.locked ? t('ロックを解除') : t('ロックする')}
+              aria-label={t('レイヤー {0} のロック切り替え', i)}
               onClick={() => updateLayer(i, { locked: !st?.locked })}
             >
               {st?.locked ? '🔒' : '🔓'}
@@ -675,7 +683,7 @@ export function Timeline() {
       if (!getState().selection.includes(id)) setSelection([id]);
       openContextMenu(e.clientX, e.clientY, [
         {
-          label: 'この位置で分割',
+          label: t('この位置で分割'),
           shortcut: 'S',
           action: () => {
             playback.pause();
@@ -683,24 +691,38 @@ export function Timeline() {
             splitAtPlayhead();
           },
         },
-        { label: '複製', shortcut: 'Ctrl+D', action: duplicateSelection },
-        { label: 'コピー', shortcut: 'Ctrl+C', action: copySelection },
-        { label: '前のオブジェクトの終了時の値を引き継ぐ', action: () => inheritFromPrevious(id) },
+        { label: t('複製'), shortcut: 'Ctrl+D', action: duplicateSelection },
+        { label: t('コピー'), shortcut: 'Ctrl+C', action: copySelection },
+        {
+          label: t('前のオブジェクトの終了時の値を引き継ぐ'),
+          action: () => inheritFromPrevious(id),
+        },
         'separator',
-        { label: '削除', shortcut: 'Delete', action: deleteSelection },
-        { label: '削除して後ろを詰める', shortcut: 'Shift+Delete', action: rippleDeleteSelection },
+        { label: t('削除'), shortcut: 'Delete', action: deleteSelection },
+        {
+          label: t('削除して後ろを詰める'),
+          shortcut: 'Shift+Delete',
+          action: rippleDeleteSelection,
+        },
       ]);
       return;
     }
-    const add = (type: ObjectType) => () => addObject(type, layer, frame);
+    const add = (type: ObjectType) => () =>
+      // 英語表示のときは、テキストの最初の文字も英語にする
+      addObject(
+        type,
+        layer,
+        frame,
+        type === 'text' && t('テキスト') !== 'テキスト' ? { params: { text: t('テキスト') } } : {},
+      );
     const state = getState();
     const otherScenes = referableScenes(state.project, state.sceneId);
     openContextMenu(e.clientX, e.clientY, [
-      { label: 'テキストを追加', action: add('text') },
-      { label: '図形を追加', action: add('shape') },
-      { label: '単色を追加', action: add('solid') },
+      { label: t('テキストを追加'), action: add('text') },
+      { label: t('図形を追加'), action: add('shape') },
+      { label: t('単色を追加'), action: add('solid') },
       {
-        label: 'シーンを追加（別のシーンを素材にする）',
+        label: t('シーンを追加（別のシーンを素材にする）'),
         disabled: otherScenes.length === 0,
         action: () =>
           addObject('scene', layer, frame, {
@@ -708,9 +730,12 @@ export function Timeline() {
             length: sceneObjectLength(state.project, otherScenes[0].id),
           }),
       },
-      { label: 'フレームバッファを追加（上までの画面を素材にする）', action: add('framebuffer') },
       {
-        label: '音声波形を追加（音声・動画の音を表示する）',
+        label: t('フレームバッファを追加（上までの画面を素材にする）'),
+        action: add('framebuffer'),
+      },
+      {
+        label: t('音声波形を追加（音声・動画の音を表示する）'),
         action: () => {
           // 音のあるオブジェクトのレイヤーを対象にする（なければ 1 つ下のレイヤー）
           const withSound = currentScene()
@@ -722,20 +747,20 @@ export function Timeline() {
         },
       },
       'separator',
-      { label: 'フィルタを追加（上のレイヤー全体にエフェクト）', action: add('filter') },
-      { label: '部分フィルタを追加（範囲の中だけエフェクト）', action: add('partialFilter') },
-      { label: 'グループ制御を追加（下のレイヤーをまとめて動かす）', action: add('group') },
-      { label: '時間制御を追加（下のレイヤーの時間を変える）', action: add('timeControl') },
-      { label: 'カメラ制御を追加（下のレイヤーを 3D で撮影）', action: add('camera') },
+      { label: t('フィルタを追加（上のレイヤー全体にエフェクト）'), action: add('filter') },
+      { label: t('部分フィルタを追加（範囲の中だけエフェクト）'), action: add('partialFilter') },
+      { label: t('グループ制御を追加（下のレイヤーをまとめて動かす）'), action: add('group') },
+      { label: t('時間制御を追加（下のレイヤーの時間を変える）'), action: add('timeControl') },
+      { label: t('カメラ制御を追加（下のレイヤーを 3D で撮影）'), action: add('camera') },
       ...usePresets
         .getState()
         .objects.filter(canAddFromPreset)
         .map((p) => ({
-          label: `プリセットから追加：${p.name}`,
+          label: t('プリセットから追加：{0}', p.name),
           action: () => addObjectFromPreset(p.id, layer, frame),
         })),
       {
-        label: '動画・画像・音声ファイルを追加…',
+        label: t('動画・画像・音声ファイルを追加…'),
         action: async () => {
           const files = await pickFilesWithInput({ accept: MEDIA_ACCEPT, multiple: true });
           const imported = await importMediaFiles(files.map((file) => ({ file })));
@@ -744,18 +769,18 @@ export function Timeline() {
       },
       'separator',
       {
-        label: '空白を詰める（このレイヤー）',
+        label: t('空白を詰める（このレイヤー）'),
         disabled: !gapAt(scene, frame, layer),
         action: () => closeGapAt(frame, layer),
       },
       {
-        label: '空白を詰める（すべてのレイヤー）',
+        label: t('空白を詰める（すべてのレイヤー）'),
         disabled: !gapAt(scene, frame),
         action: () => closeGapAt(frame),
       },
       'separator',
       {
-        label: 'ここに貼り付け',
+        label: t('ここに貼り付け'),
         shortcut: 'Ctrl+V',
         action: () => {
           setPlayhead(frame);
@@ -823,12 +848,12 @@ export function Timeline() {
   });
 
   return (
-    <section className="panel timeline" aria-label="タイムライン">
+    <section className="panel timeline" aria-label={t('タイムライン')}>
       <div className="timeline-toolbar">
-        <h2>タイムライン</h2>
+        <h2>{t('タイムライン')}</h2>
         <SceneTabs />
-        <label className="toolbar-item" title="Ctrl + ホイールでも拡大縮小できます">
-          拡大
+        <label className="toolbar-item" title={t('Ctrl + ホイールでも拡大縮小できます')}>
+          {t('拡大')}
           <input
             type="range"
             min={Math.log(MIN_PX_PER_FRAME)}
@@ -853,26 +878,26 @@ export function Timeline() {
             checked={snapEnabled}
             onChange={(e) => useUi.setState({ snap: e.target.checked })}
           />
-          吸着
+          {t('吸着')}
         </label>
         <button
           type="button"
           className="toolbar-item"
           onClick={addMarkerAtPlayhead}
-          title="再生位置にマーカーを追加（M）"
+          title={t('再生位置にマーカーを追加（M）')}
         >
-          ＋マーカー
+          {t('＋マーカー')}
         </button>
         <button
           type="button"
           className={`toolbar-item ${scene.beatGrid?.visible ? 'active' : ''}`}
           onClick={() => openDialog({ type: 'beatGrid' })}
-          title="曲のテンポに合わせた目盛り"
+          title={t('曲のテンポに合わせた目盛り')}
         >
           BPM{scene.beatGrid ? ` ${Math.round(scene.beatGrid.bpm * 100) / 100}` : ''}
         </button>
         <span className="toolbar-hint">
-          右クリックでオブジェクトを追加 ・ 素材をドロップして配置
+          {t('右クリックでオブジェクトを追加 ・ 素材をドロップして配置')}
         </span>
       </div>
       <div className="timeline-scroll" ref={scrollRef}>

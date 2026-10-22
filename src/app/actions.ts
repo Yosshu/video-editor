@@ -21,6 +21,7 @@ import {
   splitObject,
 } from '../core/timeline/ops';
 import { commit, currentScene, getState, notify, setPlayhead, setSelection } from '../state/store';
+import { t } from '../i18n';
 
 /** 既定のオブジェクトの長さ（秒） */
 const DEFAULT_SECONDS = 5;
@@ -46,7 +47,7 @@ export function addObject(
   const fps = state.project.settings.fps;
   const length = Math.max(1, init.length ?? secondsToFrames(DEFAULT_SECONDS, fps));
   if (isLayerLocked(layer)) {
-    notify(`レイヤー ${layer} はロックされています。`, 'error');
+    notify(t('レイヤー {0} はロックされています。', layer), 'error');
     return null;
   }
   const start = findFreeStart(scene, layer, frame, length);
@@ -55,7 +56,7 @@ export function addObject(
     params: init.params,
   });
   if (init.effects) obj.effects = init.effects;
-  commit('オブジェクトの追加', (draft) => {
+  commit(t('オブジェクトの追加'), (draft) => {
     draft.scenes.find((s) => s.id === state.sceneId)?.objects.push(obj);
   });
   setSelection([obj.id]);
@@ -90,10 +91,10 @@ export function moveObjects(ids: string[], deltaFrames: number, deltaLayers: num
   const placements = resolveMove(scene, ids, deltaFrames, deltaLayers);
   if (!placements) return false;
   if (placements.some((p) => isLayerLocked(p.layer))) {
-    notify('ロックされたレイヤーには移動できません。', 'error');
+    notify(t('ロックされたレイヤーには移動できません。'), 'error');
     return false;
   }
-  commit('オブジェクトの移動', (draft) => {
+  commit(t('オブジェクトの移動'), (draft) => {
     const s = draft.scenes.find((x) => x.id === state.sceneId);
     if (!s) return;
     for (const p of placements) {
@@ -118,7 +119,7 @@ export function resizeObject(id: string, edge: 'start' | 'end', targetFrame: num
     edge === 'start'
       ? paramsAfterStartChange(obj, next.start, state.project.settings.fps)
       : obj.params;
-  commit('長さの変更', (draft) => {
+  commit(t('長さの変更'), (draft) => {
     const o = draft.scenes.find((x) => x.id === state.sceneId)?.objects.find((x) => x.id === id);
     if (!o) return;
     o.start = next.start;
@@ -135,14 +136,14 @@ export function setObjectTiming(id: string, start: number, length: number): void
   if (!obj) return;
   const placements = resolveMove(scene, [id], Math.max(0, start) - obj.start, 0);
   if (!placements) {
-    notify('他のオブジェクトと重なるため移動できません。', 'error');
+    notify(t('他のオブジェクトと重なるため移動できません。'), 'error');
     return;
   }
   const newStart = placements[0].start;
   const moved = { ...obj, start: newStart };
   const others = { ...scene, objects: scene.objects.map((o) => (o.id === id ? moved : o)) };
   const resized = resolveResize(others, id, 'end', newStart + Math.max(1, Math.round(length)));
-  commit('時間の変更', (draft) => {
+  commit(t('時間の変更'), (draft) => {
     const o = draft.scenes.find((x) => x.id === state.sceneId)?.objects.find((x) => x.id === id);
     if (!o) return;
     o.start = newStart;
@@ -157,7 +158,7 @@ export function deleteSelection(): void {
     (o) => selection.includes(o.id) && isLayerLocked(o.layer),
   );
   const ids = new Set(selection.filter((id) => !locked.some((o) => o.id === id)));
-  commit('削除', (draft) => {
+  commit(t('削除'), (draft) => {
     const s = draft.scenes.find((x) => x.id === sceneId);
     if (s) s.objects = s.objects.filter((o) => !ids.has(o.id));
   });
@@ -178,7 +179,7 @@ export function splitAtPlayhead(): void {
       : candidates;
   if (targets.length === 0) return;
   const newIds: string[] = [];
-  commit('分割', (draft) => {
+  commit(t('分割'), (draft) => {
     const s = draft.scenes.find((x) => x.id === state.sceneId);
     if (!s) return;
     for (const t of targets) {
@@ -220,7 +221,7 @@ export function paste(): void {
     id: newId('ob'),
     start: o.start + delta,
   }));
-  commit('貼り付け', (draft) => {
+  commit(t('貼り付け'), (draft) => {
     const s = draft.scenes.find((x) => x.id === state.sceneId);
     if (!s) return;
     for (const o of pasted) {
@@ -251,7 +252,7 @@ export function selectAll(): void {
 export function setParam(objectId: string, paramId: string, value: ParamValue): void {
   const { sceneId } = getState();
   commit(
-    'パラメータの変更',
+    t('パラメータの変更'),
     (draft) => {
       const o = draft.scenes.find((s) => s.id === sceneId)?.objects.find((x) => x.id === objectId);
       if (o) o.params[paramId] = value;
@@ -265,7 +266,7 @@ export function updateLayer(
   patch: { name?: string; hidden?: boolean; locked?: boolean },
 ): void {
   const { sceneId } = getState();
-  commit('レイヤーの変更', (draft) => {
+  commit(t('レイヤーの変更'), (draft) => {
     const s = draft.scenes.find((x) => x.id === sceneId);
     if (!s) return;
     let layer = s.layers.find((l) => l.index === index);
@@ -309,7 +310,7 @@ export function updateProjectSettings(patch: {
   const old = state.project.settings;
   const fpsChanged =
     patch.fps !== undefined && (patch.fps.num !== old.fps.num || patch.fps.den !== old.fps.den);
-  commit('プロジェクト設定の変更', (draft) => {
+  commit(t('プロジェクト設定の変更'), (draft) => {
     // フレームレートを変えるときは、すべての時間を換算する
     if (fpsChanged) convertFrameRate(draft, patch.fps!);
     const { fps: _fps, ...rest } = patch;

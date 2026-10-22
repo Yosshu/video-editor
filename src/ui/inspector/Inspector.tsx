@@ -48,6 +48,7 @@ import {
   SelectField,
   TextField,
 } from './fields';
+import { t } from '../../i18n';
 
 /** 編集対象のパラメータ（オブジェクト自身か、そのエフェクトか） */
 interface Target {
@@ -70,8 +71,8 @@ function KeyControls({ target, def }: { target: Target; def: NumberParamDef }) {
         <button
           type="button"
           className="key-button"
-          title="前のキーへ"
-          aria-label={`${def.label}の前のキーへ`}
+          title={t('前のキーへ')}
+          aria-label={t('{0}の前のキーへ', t(def.label))}
           onClick={() => jumpToKey(obj.id, def.id, -1, effectId)}
         >
           ◀
@@ -80,8 +81,8 @@ function KeyControls({ target, def }: { target: Target; def: NumberParamDef }) {
       <button
         type="button"
         className={`key-button key-toggle ${onKey ? 'on' : animated ? 'animated' : ''}`}
-        title={onKey ? 'この時刻のキーを削除' : 'この時刻にキーを追加（アニメーション）'}
-        aria-label={`${def.label}のキーフレーム`}
+        title={onKey ? t('この時刻のキーを削除') : t('この時刻にキーを追加（アニメーション）')}
+        aria-label={t('{0}のキーフレーム', t(def.label))}
         aria-pressed={onKey}
         onClick={() => toggleKeyAtPlayhead(obj.id, def.id, def.default, effectId)}
       >
@@ -91,8 +92,8 @@ function KeyControls({ target, def }: { target: Target; def: NumberParamDef }) {
         <button
           type="button"
           className="key-button"
-          title="次のキーへ"
-          aria-label={`${def.label}の次のキーへ`}
+          title={t('次のキーへ')}
+          aria-label={t('{0}の次のキーへ', t(def.label))}
           onClick={() => jumpToKey(obj.id, def.id, 1, effectId)}
         >
           ▶
@@ -126,10 +127,10 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
   return (
     <div className="ease-row">
       <label className="field-label">
-        変化
+        {t('変化')}
         <select
           value={selectValue}
-          aria-label={`${def.label}の変化の仕方`}
+          aria-label={t('{0}の変化の仕方', t(def.label))}
           onChange={(e) => {
             const v = e.target.value;
             if (v === 'bezier') setEase({ bezier: [0.25, 0.1, 0.25, 1] });
@@ -146,14 +147,14 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
         >
           {EASE_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
-              {o.label}
+              {t(o.label)}
             </option>
           ))}
-          <option value="bezier">カスタム（曲線を編集）</option>
-          <optgroup label="特殊な変化">
+          <option value="bezier">{t('カスタム（曲線を編集）')}</option>
+          <optgroup label={t('特殊な変化')}>
             {SPECIAL_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(o.label)}
               </option>
             ))}
           </optgroup>
@@ -164,35 +165,39 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
         className="link-button"
         onClick={() => clearParamAnimation(obj.id, def.id, def.default, effectId)}
       >
-        アニメーションを解除
+        {t('アニメーションを解除')}
       </button>
       {selectValue === 'bezier' && <EaseEditor ease={ease} onChange={setEase} />}
       {special && (
         <div className="special-ease">
           <label>
-            {special.special === 'repeat' ? '周期' : '間隔'}
+            {special.special === 'repeat' ? t('周期') : t('間隔')}
             <input
               type="number"
               min={1}
               step={1}
               value={special.period}
-              aria-label={`${def.label}の${special.special === 'repeat' ? '周期' : '間隔'}（フレーム）`}
+              aria-label={t(
+                '{0}の{1}（フレーム）',
+                t(def.label),
+                special.special === 'repeat' ? t('周期') : t('間隔'),
+              )}
               onChange={(e) => {
                 const v = Math.round(Number(e.target.value));
                 if (v >= 1) setEase({ ...special, period: v });
               }}
             />
-            フレーム
+            {t('フレーム')}
           </label>
           {special.special === 'shake' && (
             <label>
-              揺れ幅
+              {t('揺れ幅')}
               <input
                 type="number"
                 min={0}
                 step={0.1}
                 value={special.amount ?? 10}
-                aria-label={`${def.label}の揺れ幅`}
+                aria-label={t('{0}の揺れ幅', t(def.label))}
                 onChange={(e) => {
                   const v = Number(e.target.value);
                   if (v >= 0) setEase({ ...special, amount: v });
@@ -206,7 +211,7 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
               checked={special.smooth === true}
               onChange={(e) => setEase({ ...special, smooth: e.target.checked })}
             />
-            なめらか
+            {t('なめらか')}
           </label>
           {special.special !== 'repeat' && (
             <button
@@ -214,7 +219,7 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
               className="link-button"
               onClick={() => setEase({ ...special, seed: Math.floor(Math.random() * 1_000_000) })}
             >
-              別の動きにする
+              {t('別の動きにする')}
             </button>
           )}
         </div>
@@ -292,7 +297,7 @@ function SceneParamField({
 function groupParams(params: ParamDef[]): [string, ParamDef[]][] {
   const groups = new Map<string, ParamDef[]>();
   for (const p of params) {
-    const g = p.group ?? 'その他';
+    const g = p.group ?? t('その他');
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g)!.push(p);
   }
@@ -326,23 +331,23 @@ function EffectCard({
           type="checkbox"
           checked={effect.enabled}
           disabled={disabled}
-          aria-label={`${def?.label ?? effect.type}を有効にする`}
+          aria-label={t('{0}を有効にする', def ? t(def.label) : effect.type)}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => setEffectEnabled(obj.id, effect.id, e.target.checked)}
         />
         <span className="effect-name">
-          {def?.label ?? `${effect.type}（このバージョンでは使えません）`}
+          {def ? t(def.label) : t('{0}（このバージョンでは使えません）', effect.type)}
         </span>
         <span className="effect-buttons">
           {def && !disabled && (
             <button
               type="button"
               className="key-button"
-              aria-label={`${def.label}の設定をプリセットに保存`}
-              title="この設定をプリセットに保存"
+              aria-label={t('{0}の設定をプリセットに保存', t(def.label))}
+              title={t('この設定をプリセットに保存')}
               onClick={(e) => {
                 e.preventDefault();
-                const name = window.prompt('プリセットの名前', def.label);
+                const name = window.prompt(t('プリセットの名前'), t(def.label));
                 if (name) saveEffectPreset(obj.id, effect.id, name);
               }}
             >
@@ -353,8 +358,8 @@ function EffectCard({
             type="button"
             className="key-button"
             disabled={disabled || index === 0}
-            aria-label="上へ"
-            title="上へ（先に適用）"
+            aria-label={t('上へ')}
+            title={t('上へ（先に適用）')}
             onClick={(e) => {
               e.preventDefault();
               moveEffect(obj.id, effect.id, -1);
@@ -366,8 +371,8 @@ function EffectCard({
             type="button"
             className="key-button"
             disabled={disabled || index === count - 1}
-            aria-label="下へ"
-            title="下へ（後で適用）"
+            aria-label={t('下へ')}
+            title={t('下へ（後で適用）')}
             onClick={(e) => {
               e.preventDefault();
               moveEffect(obj.id, effect.id, 1);
@@ -379,8 +384,8 @@ function EffectCard({
             type="button"
             className="key-button"
             disabled={disabled}
-            aria-label={`${def?.label ?? effect.type}を削除`}
-            title="削除"
+            aria-label={t('{0}を削除', def ? t(def.label) : effect.type)}
+            title={t('削除')}
             onClick={(e) => {
               e.preventDefault();
               removeEffect(obj.id, effect.id);
@@ -416,7 +421,10 @@ function EffectsSection({
   );
   return (
     <details open className="param-group effects-section">
-      <summary>エフェクト{obj.effects.length > 0 ? `（${obj.effects.length}）` : ''}</summary>
+      <summary>
+        {t('エフェクト')}
+        {obj.effects.length > 0 ? `（${obj.effects.length}）` : ''}
+      </summary>
       {obj.effects.map((e, i) => (
         <EffectCard
           key={e.id}
@@ -431,7 +439,7 @@ function EffectsSection({
       {!disabled && (
         <select
           className="add-effect"
-          aria-label="エフェクトを追加"
+          aria-label={t('エフェクトを追加')}
           value=""
           onChange={(e) => {
             const v = e.target.value;
@@ -439,23 +447,23 @@ function EffectsSection({
             else if (v) addEffect(obj.id, v);
           }}
         >
-          <option value="">＋ エフェクトを追加…</option>
+          <option value="">{t('＋ エフェクトを追加…')}</option>
           {EFFECT_CATEGORIES.filter((c) => available.some((d) => d.category === c)).map((c) => (
-            <optgroup key={c} label={c}>
+            <optgroup key={c} label={t(c)}>
               {available
                 .filter((d) => d.category === c)
                 .map((d) => (
                   <option key={d.type} value={d.type}>
-                    {d.label}
+                    {t(d.label)}
                   </option>
                 ))}
             </optgroup>
           ))}
           {presets.length > 0 && (
-            <optgroup label="プリセット">
+            <optgroup label={t('プリセット')}>
               {presets.map((p) => (
                 <option key={p.id} value={`preset:${p.id}`}>
-                  {p.name}（{getEffectDef(p.type)?.label ?? p.type}）
+                  {p.name}（{t(getEffectDef(p.type)?.label ?? p.type)}）
                 </option>
               ))}
             </optgroup>
@@ -464,7 +472,7 @@ function EffectsSection({
       )}
       {obj.type === 'filter' && obj.effects.length === 0 && (
         <p className="hint">
-          フィルタは、自分より上のレイヤーをすべて合成した画面にエフェクトをかけます。
+          {t('フィルタは、自分より上のレイヤーをすべて合成した画面にエフェクトをかけます。')}
         </p>
       )}
     </details>
@@ -477,20 +485,20 @@ function ObjectPresetMenu({ obj }: { obj: TimelineObject }) {
   return (
     <select
       className="preset-menu"
-      aria-label="プリセット"
+      aria-label={t('プリセット')}
       value=""
       onChange={(e) => {
         const v = e.target.value;
         if (v === 'save') {
-          const name = window.prompt('プリセットの名前', getObjectDef(obj.type).label);
+          const name = window.prompt(t('プリセットの名前'), t(getObjectDef(obj.type).label));
           if (name) saveObjectPreset(obj.id, name);
         } else if (v) applyObjectPreset(obj.id, v);
       }}
     >
-      <option value="">プリセット…</option>
-      <option value="save">この設定をプリセットに保存…</option>
+      <option value="">{t('プリセット…')}</option>
+      <option value="save">{t('この設定をプリセットに保存…')}</option>
       {presets.length > 0 && (
-        <optgroup label="適用する">
+        <optgroup label={t('適用する')}>
           {presets.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -521,7 +529,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
     <div className="inspector-content">
       <div className="inspector-title">
         <span className="type-badge" style={{ background: def.color }}>
-          {def.label}
+          {t(def.label)}
         </span>
         {asset && (
           <span className="asset-ref" title={asset.name}>
@@ -530,30 +538,30 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
         )}
         {!locked && <ObjectPresetMenu obj={obj} />}
       </div>
-      {locked && <p className="hint">レイヤーがロックされているため編集できません。</p>}
+      {locked && <p className="hint">{t('レイヤーがロックされているため編集できません。')}</p>}
       {!locked && def.params.some((p) => p.kind === 'number' && p.animatable) && (
         <div className="midpoint-row">
           <button
             type="button"
             onClick={() => addMidpointAtPlayhead(obj.id)}
-            title="動いているすべてのパラメータの、この時刻にキーを打ちます"
+            title={t('動いているすべてのパラメータの、この時刻にキーを打ちます')}
           >
-            中間点を追加
+            {t('中間点を追加')}
           </button>
           <button
             type="button"
             onClick={() => removeMidpointAtPlayhead(obj.id)}
             disabled={!keys.includes(local)}
           >
-            中間点を削除
+            {t('中間点を削除')}
           </button>
-          <span className="dim">{keys.length > 0 ? `キー ${keys.length} 個` : ''}</span>
+          <span className="dim">{keys.length > 0 ? t('キー {0} 個', keys.length) : ''}</span>
         </div>
       )}
       <details open className="param-group">
-        <summary>時間</summary>
+        <summary>{t('時間')}</summary>
         <div className="timing-grid">
-          <label htmlFor="ins-start">開始</label>
+          <label htmlFor="ins-start">{t('開始')}</label>
           <input
             id="ins-start"
             type="number"
@@ -565,7 +573,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
             }
           />
           <span className="dim">{formatTimecode(obj.start, fps)}</span>
-          <label htmlFor="ins-length">長さ</label>
+          <label htmlFor="ins-length">{t('長さ')}</label>
           <input
             id="ins-length"
             type="number"
@@ -576,8 +584,10 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
               e.target.value !== '' && setObjectTiming(obj.id, obj.start, Number(e.target.value))
             }
           />
-          <span className="dim">{(obj.length / fpsValue(fps)).toFixed(2)} 秒</span>
-          <span>レイヤー</span>
+          <span className="dim">
+            {(obj.length / fpsValue(fps)).toFixed(2)} {t('秒')}
+          </span>
+          <span>{t('レイヤー')}</span>
           <span>{obj.layer}</span>
           <span />
         </div>
@@ -587,7 +597,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
         if (visible.length === 0) return null;
         return (
           <details key={group} open={!COLLAPSED_GROUPS.includes(group)} className="param-group">
-            <summary>{group}</summary>
+            <summary>{t(group)}</summary>
             {visible.map((p) => (
               <ParamField
                 key={p.id}
@@ -611,11 +621,11 @@ export function Inspector() {
   const settings = useEditor((s) => s.project.settings);
 
   return (
-    <section className="panel inspector" aria-label="設定">
+    <section className="panel inspector" aria-label={t('設定')}>
       <header className="panel-header">
-        <h2>設定</h2>
+        <h2>{t('設定')}</h2>
         {selection.length > 1 && (
-          <span className="dim">{selection.length} 個選択中（先頭を表示）</span>
+          <span className="dim">{t('{0} 個選択中（先頭を表示）', selection.length)}</span>
         )}
       </header>
       <div className="panel-body">
@@ -624,16 +634,16 @@ export function Inspector() {
         ) : (
           <div className="inspector-content">
             <p className="empty-hint">
-              タイムラインのオブジェクトを選ぶと、ここで設定を変更できます。
+              {t('タイムラインのオブジェクトを選ぶと、ここで設定を変更できます。')}
             </p>
             <dl className="project-summary">
-              <dt>解像度</dt>
+              <dt>{t('解像度')}</dt>
               <dd>
                 {settings.width} × {settings.height}
               </dd>
-              <dt>フレームレート</dt>
+              <dt>{t('フレームレート')}</dt>
               <dd>{Math.round(fpsValue(settings.fps) * 1000) / 1000} fps</dd>
-              <dt>サンプリングレート</dt>
+              <dt>{t('サンプリングレート')}</dt>
               <dd>{settings.sampleRate} Hz</dd>
             </dl>
           </div>

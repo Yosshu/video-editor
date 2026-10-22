@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { t } from '../../i18n';
 
 interface DialogProps {
   title: string;
@@ -44,7 +45,7 @@ export function Dialog({
       <header className="dialog-header">
         <h2>{title}</h2>
         {!modal && (
-          <button type="button" className="icon-button" onClick={onClose} aria-label="閉じる">
+          <button type="button" className="icon-button" onClick={onClose} aria-label={t('閉じる')}>
             ×
           </button>
         )}

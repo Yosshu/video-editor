@@ -3,6 +3,7 @@ import { newId } from '../../core/model/ids';
 import { detectAssetKind } from './detect';
 import { computeFingerprint } from './fingerprint';
 import { describeMedia, openMediaSource, type MediaSourceHandle } from './mediaSource';
+import { t } from '../../i18n';
 
 export class AssetImportError extends Error {}
 
@@ -66,7 +67,7 @@ export class AssetRegistry {
   async importFile(file: File, kindHint?: AssetKind): Promise<Asset> {
     const kind = kindHint ?? detectAssetKind(file);
     if (!kind || kind === 'font') {
-      throw new AssetImportError(`「${file.name}」は対応していない種類のファイルです。`);
+      throw new AssetImportError(t('「{0}」は対応していない種類のファイルです。', file.name));
     }
     const fingerprint = await computeFingerprint(file);
     const base = {
@@ -82,7 +83,7 @@ export class AssetRegistry {
       try {
         image = await decodeImage(file);
       } catch {
-        throw new AssetImportError(`画像「${file.name}」を読み込めませんでした。`);
+        throw new AssetImportError(t('画像「{0}」を読み込めませんでした。', file.name));
       }
       const asset: Asset = { ...base, kind: 'image', width: image.width, height: image.height };
       this.runtimes.set(asset.id, { file, image });

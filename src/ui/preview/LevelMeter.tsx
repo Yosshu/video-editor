@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getPreviewAudioLevels } from '../../engine/preview/previewMediaInstance';
 import { useEditor } from '../../state/store';
+import { t } from '../../i18n';
 
 /** 表示する範囲（dB） */
 const MIN_DB = -60;
@@ -55,7 +56,7 @@ export function LevelMeter() {
   return (
     <div
       className="level-meter"
-      title="音量（左・右）。赤いランプは音割れ（0dB 超え）、クリックで消灯"
+      title={t('音量（左・右）。赤いランプは音割れ（0dB 超え）、クリックで消灯')}
       onClick={() => {
         clipped.current = [false, false];
         clips.current.forEach((c) => c?.classList.remove('on'));

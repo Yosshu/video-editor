@@ -1,5 +1,6 @@
 import { newId } from '../model/ids';
 import type { ObjectType, Project, ProjectSettings, Scene, TimelineObject } from '../model/types';
+import { t } from '../../i18n';
 
 export const FORMAT_ID = 'vedproj';
 export const FORMAT_VERSION = 1;
@@ -31,7 +32,7 @@ export function createScene(name: string, width: number, height: number): Scene 
 
 export function createProject(settings: Partial<ProjectSettings> = {}): Project {
   const s: ProjectSettings = { ...DEFAULT_SETTINGS, ...settings };
-  const scene = createScene('メイン', s.width, s.height);
+  const scene = createScene(t('メイン'), s.width, s.height);
   const now = new Date().toISOString();
   return {
     format: FORMAT_ID,

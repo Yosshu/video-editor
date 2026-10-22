@@ -3,6 +3,7 @@ import { resetAllKeys, setCustomKeys, useKeymap } from '../../../state/keymap';
 import { closeDialog } from '../../../state/ui';
 import { Dialog } from '../../common/Dialog';
 import { COMMANDS, commandForKey, formatKey, keyString, keysOf, MOUSE_HINTS } from '../shortcuts';
+import { t } from '../../../i18n';
 
 const GROUPS = [...new Set(COMMANDS.map((c) => c.group))];
 
@@ -27,7 +28,12 @@ export function ShortcutsDialog() {
       const other = commandForKey(key, command.id);
       if (other) {
         const ok = window.confirm(
-          `${formatKey(key)} は「${other.label}」に割り当てられています。「${command.label}」に付け替えますか？`,
+          t(
+            '{0} は「{1}」に割り当てられています。「{2}」に付け替えますか？',
+            formatKey(key),
+            t(other.label),
+            t(command.label),
+          ),
         );
         if (!ok) {
           setCapturing(null);
@@ -48,7 +54,7 @@ export function ShortcutsDialog() {
 
   return (
     <Dialog
-      title="キーボードショートカット"
+      title={t('キーボードショートカット')}
       onClose={closeDialog}
       width={640}
       footer={
@@ -56,32 +62,33 @@ export function ShortcutsDialog() {
           <button
             type="button"
             onClick={() => {
-              if (window.confirm('すべてのショートカットを最初の状態に戻しますか？'))
+              if (window.confirm(t('すべてのショートカットを最初の状態に戻しますか？')))
                 resetAllKeys();
             }}
           >
-            すべて既定に戻す
+            {t('すべて既定に戻す')}
           </button>
           <button type="button" onClick={closeDialog}>
-            閉じる
+            {t('閉じる')}
           </button>
         </>
       }
     >
       <p className="hint">
-        「＋」を押してから割り当てたいキーを押します（Esc
-        で取り消し）。設定はこのブラウザに保存されます。
+        {t(
+          '「＋」を押してから割り当てたいキーを押します（Esc で取り消し）。設定はこのブラウザに保存されます。',
+        )}
       </p>
       {GROUPS.map((group) => (
         <section key={group} className="shortcut-group">
-          <h3>{group}</h3>
+          <h3>{t(group)}</h3>
           <table className="shortcut-table">
             <tbody>
               {COMMANDS.filter((c) => c.group === group).map((c) => {
                 const keys = keysOf(c, custom);
                 return (
                   <tr key={c.id} data-command={c.id}>
-                    <td>{c.label}</td>
+                    <td>{t(c.label)}</td>
                     <td className="shortcut-keys">
                       {keys.map((k) => (
                         <span key={k} className="key-chip">
@@ -89,7 +96,7 @@ export function ShortcutsDialog() {
                           <button
                             type="button"
                             className="key-remove"
-                            aria-label={`${c.label}から ${formatKey(k)} を外す`}
+                            aria-label={t('{0}から {1} を外す', t(c.label), formatKey(k))}
                             onClick={() =>
                               setCustomKeys(
                                 c.id,
@@ -102,12 +109,12 @@ export function ShortcutsDialog() {
                         </span>
                       ))}
                       {capturing === c.id ? (
-                        <span className="capturing">キーを押してください…</span>
+                        <span className="capturing">{t('キーを押してください…')}</span>
                       ) : (
                         <button
                           type="button"
                           className="key-add"
-                          aria-label={`${c.label}にキーを追加`}
+                          aria-label={t('{0}にキーを追加', t(c.label))}
                           onClick={() => setCapturing(c.id)}
                         >
                           ＋
@@ -121,7 +128,7 @@ export function ShortcutsDialog() {
                           className="link-button"
                           onClick={() => setCustomKeys(c.id, null)}
                         >
-                          既定に戻す
+                          {t('既定に戻す')}
                         </button>
                       )}
                     </td>
@@ -133,14 +140,14 @@ export function ShortcutsDialog() {
         </section>
       ))}
       <section className="shortcut-group">
-        <h3>マウス</h3>
+        <h3>{t('マウス')}</h3>
         <table className="shortcut-table">
           <tbody>
             {MOUSE_HINTS.map((h) => (
               <tr key={h.keys}>
-                <td>{h.label}</td>
+                <td>{t(h.label)}</td>
                 <td>
-                  <kbd>{h.keys}</kbd>
+                  <kbd>{t(h.keys)}</kbd>
                 </td>
                 <td />
               </tr>

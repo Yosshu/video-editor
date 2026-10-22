@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 /**
  * 無圧縮の ZIP を読み書きする（素材同梱パッケージ用）。
  * - 書き込みは先頭から順に出力するだけなので、大きなファイルもメモリにためずに書ける
@@ -280,18 +281,18 @@ export async function readZipEntries(blob: Blob): Promise<ZipEntry[]> {
       break;
     }
   }
-  if (eocd < 0) throw new ZipFormatError('ZIP ファイルではありません。');
+  if (eocd < 0) throw new ZipFormatError(t('ZIP ファイルではありません。'));
   let count = tail.getUint16(eocd + 10, true);
   let cdSize = tail.getUint32(eocd + 12, true);
   let cdOffset = tail.getUint32(eocd + 16, true);
   if (cdOffset === MAX32 || count === 0xffff || cdSize === MAX32) {
     const loc = eocd - 20;
     if (loc < 0 || tail.getUint32(loc, true) !== SIG_ZIP64_LOCATOR)
-      throw new ZipFormatError('ZIP64 の情報が見つかりません。');
+      throw new ZipFormatError(t('ZIP64 の情報が見つかりません。'));
     const z64Offset = Number(tail.getBigUint64(loc + 8, true));
     const z = await readBytes(blob, z64Offset, z64Offset + 56);
     if (z.getUint32(0, true) !== SIG_ZIP64_EOCD)
-      throw new ZipFormatError('ZIP64 の情報が不正です。');
+      throw new ZipFormatError(t('ZIP64 の情報が不正です。'));
     count = Number(z.getBigUint64(32, true));
     cdSize = Number(z.getBigUint64(40, true));
     cdOffset = Number(z.getBigUint64(48, true));
@@ -300,7 +301,8 @@ export async function readZipEntries(blob: Blob): Promise<ZipEntry[]> {
   const entries: ZipEntry[] = [];
   let p = 0;
   for (let n = 0; n < count; n++) {
-    if (cd.getUint32(p, true) !== SIG_CENTRAL) throw new ZipFormatError('ZIP の一覧が不正です。');
+    if (cd.getUint32(p, true) !== SIG_CENTRAL)
+      throw new ZipFormatError(t('ZIP の一覧が不正です。'));
     const method = cd.getUint16(p + 10, true);
     let compressedSize = cd.getUint32(p + 20, true);
     let size = cd.getUint32(p + 24, true);
@@ -331,7 +333,7 @@ export async function readZipEntries(blob: Blob): Promise<ZipEntry[]> {
     }
     const local = await readBytes(blob, localOffset, localOffset + 30);
     if (local.getUint32(0, true) !== SIG_LOCAL)
-      throw new ZipFormatError('ZIP のデータが不正です。');
+      throw new ZipFormatError(t('ZIP のデータが不正です。'));
     const dataOffset = localOffset + 30 + local.getUint16(26, true) + local.getUint16(28, true);
     entries.push({ name, method, compressedSize, size, dataOffset });
     p += 46 + nameLen + extraLen + commentLen;
@@ -347,5 +349,5 @@ export async function zipEntryBlob(blob: Blob, entry: ZipEntry): Promise<Blob> {
     const stream = raw.stream().pipeThrough(new DecompressionStream('deflate-raw'));
     return new Response(stream).blob();
   }
-  throw new ZipFormatError(`対応していない圧縮方式です（${entry.method}）。`);
+  throw new ZipFormatError(t('対応していない圧縮方式です（{0}）。', entry.method));
 }

@@ -13,6 +13,7 @@ import {
   type ObjectPreset,
 } from '../state/presets';
 import { addObject } from './actions';
+import { t } from '../i18n';
 
 /** 素材やシーンに結びついていて、プリセットに入れないパラメータ */
 const NOT_SAVED = ['sceneRef', 'offset'];
@@ -35,7 +36,7 @@ export function saveObjectPreset(objectId: string, name: string): void {
     effects: structuredClone(obj.effects),
   };
   updatePresets((c) => ({ ...c, objects: [...c.objects, preset] }));
-  notify(`プリセット「${preset.name}」を保存しました。`);
+  notify(t('プリセット「{0}」を保存しました。', preset.name));
 }
 
 /** オブジェクトにプリセットを適用する（時間・素材・文字の内容はそのまま） */
@@ -43,7 +44,7 @@ export function applyObjectPreset(objectId: string, presetId: string): void {
   const preset = usePresets.getState().objects.find((p) => p.id === presetId);
   const { sceneId } = getState();
   if (!preset) return;
-  commit('プリセットの適用', (draft) => {
+  commit(t('プリセットの適用'), (draft) => {
     const o = draft.scenes.find((s) => s.id === sceneId)?.objects.find((x) => x.id === objectId);
     if (!o || o.type !== preset.type) return;
     const kept = Object.fromEntries(
@@ -81,14 +82,14 @@ export function saveEffectPreset(objectId: string, effectId: string, name: strin
     params: structuredClone(effect.params),
   };
   updatePresets((c) => ({ ...c, effects: [...c.effects, preset] }));
-  notify(`プリセット「${preset.name}」を保存しました。`);
+  notify(t('プリセット「{0}」を保存しました。', preset.name));
 }
 
 export function addEffectFromPreset(objectId: string, presetId: string): void {
   const preset = usePresets.getState().effects.find((p) => p.id === presetId);
   const { sceneId } = getState();
   if (!preset) return;
-  commit('エフェクトの追加', (draft) => {
+  commit(t('エフェクトの追加'), (draft) => {
     const o = draft.scenes.find((s) => s.id === sceneId)?.objects.find((x) => x.id === objectId);
     o?.effects.push({
       id: newId('fx'),
@@ -128,7 +129,7 @@ export async function importPresets(): Promise<void> {
       data && typeof data === 'object' && (data as { format?: unknown }).format === PRESET_FORMAT
         ? parsePresets(data)
         : null;
-    if (!parsed) throw new Error('形式が違います');
+    if (!parsed) throw new Error(t('形式が違います'));
     // 同じ ID があれば付け直して、すべて追加する
     const reId = <T extends { id: string }>(list: T[], existing: T[]) =>
       list.map((p) => (existing.some((e) => e.id === p.id) ? { ...p, id: newId('pr') } : p));
@@ -137,9 +138,13 @@ export async function importPresets(): Promise<void> {
       effects: [...c.effects, ...reId(parsed.effects, c.effects)],
     }));
     notify(
-      `プリセットを読み込みました（オブジェクト ${parsed.objects.length} 件・エフェクト ${parsed.effects.length} 件）。`,
+      t(
+        'プリセットを読み込みました（オブジェクト {0} 件・エフェクト {1} 件）。',
+        parsed.objects.length,
+        parsed.effects.length,
+      ),
     );
   } catch {
-    notify('プリセットのファイルを読み込めませんでした。', 'error');
+    notify(t('プリセットのファイルを読み込めませんでした。'), 'error');
   }
 }

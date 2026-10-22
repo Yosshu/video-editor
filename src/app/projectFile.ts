@@ -21,6 +21,7 @@ import {
 import { getState, notify, replaceProject, setAssetStatus, useEditor } from '../state/store';
 import { openDialog, useUi } from '../state/ui';
 import { missingAssets, rememberPackageSlice, restoreAssets } from './assets';
+import { t } from '../i18n';
 
 const AUTOSAVE_KEY = 'autosave';
 const PROJECT_HANDLE_KEY = 'projectHandle';
@@ -68,19 +69,19 @@ export async function saveProject(options: { saveAs?: boolean } = {}): Promise<b
     } else {
       let name = suggestedName();
       if (options.saveAs || !getState().fileName) {
-        const input = window.prompt('保存するファイル名', name);
+        const input = window.prompt(t('保存するファイル名'), name);
         if (!input) return false;
         name = input.endsWith(PROJECT_EXTENSION) ? input : `${input}${PROJECT_EXTENSION}`;
       }
       downloadBlob(new Blob([json], { type: 'application/json' }), name);
       useEditor.setState({ dirty: false, fileName: name });
     }
-    notify('保存しました。');
+    notify(t('保存しました。'));
     return true;
   } catch (e) {
     if (isAbortError(e)) return false;
     console.error(e);
-    notify('保存できませんでした。', 'error');
+    notify(t('保存できませんでした。'), 'error');
     return false;
   }
 }
@@ -108,9 +109,10 @@ export async function openProjectFile(file: File, handle?: FileSystemFileHandle)
     currentHandle = handle ?? null;
     if (handle) idbSet('kv', PROJECT_HANDLE_KEY, handle).catch(() => undefined);
     await loadProject(project, file.name, warnings);
-    notify(`「${file.name}」を開きました。`);
+    notify(t('「{0}」を開きました。', file.name));
   } catch (e) {
-    const message = e instanceof ProjectFileError ? e.message : '編集ファイルを開けませんでした。';
+    const message =
+      e instanceof ProjectFileError ? e.message : t('編集ファイルを開けませんでした。');
     notify(message, 'error');
     console.error(e);
   }
@@ -122,7 +124,7 @@ export async function pickAndOpenProject(): Promise<void> {
       const [handle] = await window.showOpenFilePicker({ types: OPEN_TYPES, id: 'project' });
       await openProjectFile(await handle.getFile(), handle);
     } catch (e) {
-      if (!isAbortError(e)) notify('編集ファイルを開けませんでした。', 'error');
+      if (!isAbortError(e)) notify(t('編集ファイルを開けませんでした。'), 'error');
     }
     return;
   }
@@ -194,7 +196,7 @@ export async function restoreAutosave(): Promise<void> {
     await loadProject(project, record.fileName, warnings);
     useEditor.setState({ dirty: true });
   } catch (e) {
-    notify('自動保存データを復元できませんでした。', 'error');
+    notify(t('自動保存データを復元できませんでした。'), 'error');
     console.error(e);
   }
 }
@@ -219,7 +221,10 @@ export async function savePackage(): Promise<boolean> {
   const unloaded = project.assets.filter((a) => !assetRegistry.getFile(a.id));
   if (missing.length > 0 || unloaded.length > 0) {
     notify(
-      `見つからない素材があるため、素材ごと保存できません（${[...missing, ...unloaded][0].name} など）。先に素材を指定し直してください。`,
+      t(
+        '見つからない素材があるため、素材ごと保存できません（{0} など）。先に素材を指定し直してください。',
+        [...missing, ...unloaded][0].name,
+      ),
       'error',
     );
     return false;
@@ -232,7 +237,10 @@ export async function savePackage(): Promise<boolean> {
       const handle = await window.showSaveFilePicker({
         suggestedName: `${base}${PACKAGE_EXTENSION}`,
         types: [
-          { description: '素材同梱パッケージ', accept: { 'application/zip': [PACKAGE_EXTENSION] } },
+          {
+            description: t('素材同梱パッケージ'),
+            accept: { 'application/zip': [PACKAGE_EXTENSION] },
+          },
         ],
         id: 'package',
       });
@@ -253,7 +261,7 @@ export async function savePackage(): Promise<boolean> {
         );
     }
   } catch (e) {
-    if (!isAbortError(e)) notify('保存できませんでした。', 'error');
+    if (!isAbortError(e)) notify(t('保存できませんでした。'), 'error');
     return false;
   }
 
@@ -262,7 +270,7 @@ export async function savePackage(): Promise<boolean> {
     0,
   );
   let done = 0;
-  useUi.setState({ busy: { label: '素材ごと保存しています…', progress: 0 } });
+  useUi.setState({ busy: { label: t('素材ごと保存しています…'), progress: 0 } });
   try {
     const zip = new ZipWriter(sink);
     const encoder = new TextEncoder();
@@ -277,7 +285,7 @@ export async function savePackage(): Promise<boolean> {
         onProgress: (written) => {
           done = before + written;
           useUi.setState({
-            busy: { label: '素材ごと保存しています…', progress: done / Math.max(1, total) },
+            busy: { label: t('素材ごと保存しています…'), progress: done / Math.max(1, total) },
           });
         },
       });
@@ -285,11 +293,11 @@ export async function savePackage(): Promise<boolean> {
     }
     await zip.finish();
     await finish();
-    notify('素材ごと保存しました。');
+    notify(t('素材ごと保存しました。'));
     return true;
   } catch (e) {
     console.error(e);
-    notify('素材ごと保存できませんでした。', 'error');
+    notify(t('素材ごと保存できませんでした。'), 'error');
     return false;
   } finally {
     useUi.setState({ busy: null });
@@ -302,7 +310,7 @@ export async function openPackageFile(file: File, handle?: FileSystemFileHandle)
     const entries = await readZipEntries(file);
     const projectEntry = entries.find((e) => e.name === 'project.vedproj');
     if (!projectEntry)
-      throw new ProjectFileError('素材同梱パッケージの中に編集ファイルがありません。');
+      throw new ProjectFileError(t('素材同梱パッケージの中に編集ファイルがありません。'));
     const { project, warnings } = parseProject(
       await (await zipEntryBlob(file, projectEntry)).text(),
     );
@@ -340,12 +348,12 @@ export async function openPackageFile(file: File, handle?: FileSystemFileHandle)
     if (missing.length > 0) openDialog({ type: 'missingAssets' });
     // 保存すると編集ファイル（.vedproj）になるので、変更ありとして扱う
     useEditor.setState({ dirty: true });
-    notify(`「${file.name}」を開きました。`);
+    notify(t('「{0}」を開きました。', file.name));
   } catch (e) {
     const message =
       e instanceof ProjectFileError || e instanceof ZipFormatError
         ? e.message
-        : '素材同梱パッケージを開けませんでした。';
+        : t('素材同梱パッケージを開けませんでした。');
     notify(message, 'error');
     console.error(e);
   }

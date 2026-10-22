@@ -5,6 +5,7 @@ import { newProject } from '../../../app/projectFile';
 import { getState } from '../../../state/store';
 import { closeDialog } from '../../../state/ui';
 import { Dialog } from '../../common/Dialog';
+import { t } from '../../../i18n';
 
 export function NewProjectDialog() {
   const [width, setWidth] = useState(DEFAULT_SETTINGS.width);
@@ -16,7 +17,7 @@ export function NewProjectDialog() {
   const create = () => {
     if (
       getState().dirty &&
-      !window.confirm('保存していない変更は失われます。新しいプロジェクトを作成しますか？')
+      !window.confirm(t('保存していない変更は失われます。新しいプロジェクトを作成しますか？'))
     )
       return;
     const fps = FPS_PRESETS.find((p) => p.label === fpsLabel)?.fps ?? DEFAULT_SETTINGS.fps;
@@ -32,21 +33,21 @@ export function NewProjectDialog() {
 
   return (
     <Dialog
-      title="新しいプロジェクト"
+      title={t('新しいプロジェクト')}
       onClose={closeDialog}
       footer={
         <>
           <button type="button" onClick={closeDialog}>
-            キャンセル
+            {t('キャンセル')}
           </button>
           <button type="button" className="primary" onClick={create}>
-            作成
+            {t('作成')}
           </button>
         </>
       }
     >
       <div className="form-grid">
-        <label htmlFor="np-preset">プリセット</label>
+        <label htmlFor="np-preset">{t('プリセット')}</label>
         <select
           id="np-preset"
           value={`${width}x${height}`}
@@ -60,14 +61,14 @@ export function NewProjectDialog() {
         >
           {RESOLUTION_PRESETS.map((p) => (
             <option key={p.label} value={`${p.width}x${p.height}`}>
-              {p.label}
+              {t(p.label)}
             </option>
           ))}
           {!RESOLUTION_PRESETS.some((p) => p.width === width && p.height === height) && (
-            <option value={`${width}x${height}`}>カスタム</option>
+            <option value={`${width}x${height}`}>{t('カスタム')}</option>
           )}
         </select>
-        <label htmlFor="np-width">幅 × 高さ</label>
+        <label htmlFor="np-width">{t('幅 × 高さ')}</label>
         <div className="inline">
           <input
             id="np-width"
@@ -79,7 +80,7 @@ export function NewProjectDialog() {
           />
           <span>×</span>
           <input
-            aria-label="高さ"
+            aria-label={t('高さ')}
             type="number"
             min={16}
             max={8192}
@@ -88,15 +89,15 @@ export function NewProjectDialog() {
           />
           <span>px</span>
         </div>
-        <label htmlFor="np-fps">フレームレート</label>
+        <label htmlFor="np-fps">{t('フレームレート')}</label>
         <select id="np-fps" value={fpsLabel} onChange={(e) => setFpsLabel(e.target.value)}>
           {FPS_PRESETS.map((p) => (
             <option key={p.label} value={p.label}>
-              {p.label} fps
+              {t(p.label)} fps
             </option>
           ))}
         </select>
-        <label htmlFor="np-rate">音声サンプリングレート</label>
+        <label htmlFor="np-rate">{t('音声サンプリングレート')}</label>
         <select
           id="np-rate"
           value={sampleRate}
@@ -105,7 +106,7 @@ export function NewProjectDialog() {
           <option value={44100}>44100 Hz</option>
           <option value={48000}>48000 Hz</option>
         </select>
-        <label htmlFor="np-bg">背景色</label>
+        <label htmlFor="np-bg">{t('背景色')}</label>
         <input
           id="np-bg"
           type="color"

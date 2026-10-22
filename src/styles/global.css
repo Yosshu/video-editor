@@ -13,6 +13,17 @@
   --warning: #f5b544;
   --row-a: #1d2025;
   --row-b: #1a1c21;
+  --hover-border: #4a5160;
+  --hover-bg: #323743;
+  --menubar-bg: #121418;
+  --asset-hover: #333844;
+  --preview-bg: #0e0f12;
+  --tick: #555c69;
+  --tick-major: #7a8291;
+  --row-line: #23262c;
+  --beat: rgba(255, 255, 255, 0.05);
+  --beat-bar: rgba(255, 255, 255, 0.14);
+  --shadow: rgb(0 0 0 / 45%);
   font-family:
     system-ui,
     -apple-system,
@@ -24,6 +35,34 @@
   font-size: 13px;
   background: var(--bg);
   color: var(--text);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f3f4f6;
+  --bg-panel: #ffffff;
+  --bg-elevated: #eceef2;
+  --bg-input: #ffffff;
+  --border: #d0d5dd;
+  --text: #1f2328;
+  --text-dim: #5d6572;
+  --accent: #2f6fe6;
+  --accent-strong: #2458c4;
+  --danger: #d63b3b;
+  --warning: #b7791f;
+  --row-a: #f7f8fa;
+  --row-b: #eef0f3;
+  --hover-border: #b4bcc8;
+  --hover-bg: #e2e6ec;
+  --menubar-bg: #e8ebef;
+  --asset-hover: #e0e4ea;
+  --preview-bg: #d5d9df;
+  --tick: #a5abb5;
+  --tick-major: #7b838f;
+  --row-line: #e0e3e8;
+  --beat: rgba(0, 0, 0, 0.06);
+  --beat-bar: rgba(0, 0, 0, 0.16);
+  --shadow: rgb(0 0 0 / 18%);
 }
 
 * {
@@ -55,8 +94,8 @@ button {
 }
 
 button:hover:not(:disabled) {
-  border-color: #4a5160;
-  background: #323743;
+  border-color: var(--hover-border);
+  background: var(--hover-bg);
 }
 
 button:disabled {
@@ -237,7 +276,7 @@ textarea {
   align-items: center;
   gap: 12px;
   padding: 4px 10px;
-  background: #121418;
+  background: var(--menubar-bg);
   border-bottom: 1px solid var(--border);
   min-width: 0;
 }
@@ -266,7 +305,7 @@ textarea {
 }
 
 .file-name {
-  margin-left: auto;
+  margin-left: 8px;
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
@@ -302,7 +341,7 @@ textarea {
 }
 
 .asset-item:hover {
-  background: #333844;
+  background: var(--asset-hover);
 }
 
 .asset-item.missing {
@@ -361,7 +400,7 @@ textarea {
   place-items: center;
   padding: 8px;
   overflow: hidden;
-  background: #0e0f12;
+  background: var(--preview-bg);
 }
 
 .preview-stage {
@@ -615,12 +654,12 @@ textarea {
   bottom: 0;
   width: 1px;
   height: 6px;
-  background: #555c69;
+  background: var(--tick);
 }
 
 .tick.major {
   height: 12px;
-  background: #7a8291;
+  background: var(--tick-major);
 }
 
 .tick span {
@@ -646,7 +685,7 @@ textarea {
   align-items: center;
   gap: 2px;
   padding: 0 4px;
-  border-bottom: 1px solid #23262c;
+  border-bottom: 1px solid var(--row-line);
   font-size: 12px;
   user-select: none;
 }
@@ -931,7 +970,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 4px;
-  box-shadow: 0 6px 24px rgb(0 0 0 / 45%);
+  box-shadow: 0 6px 24px var(--shadow);
 }
 
 .context-item {
@@ -1343,12 +1382,12 @@ kbd {
   position: absolute;
   top: 0;
   width: 1px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--beat);
   pointer-events: none;
 }
 
 .tl-beat.bar {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--beat-bar);
 }
 
 .toolbar-item.active {
@@ -1487,4 +1526,16 @@ kbd {
   border-radius: 6px;
   background: var(--bg-elevated);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* 言語と配色の切り替え */
+.menu-settings {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.menu-settings select {
+  font-size: 12px;
 }

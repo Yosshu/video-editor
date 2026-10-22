@@ -19,6 +19,7 @@ import { AudioReaderPool } from '../audio/sources';
 import { assetRegistry } from '../media/registry';
 import type { ContainerFormat } from './codecs';
 import { OfflineRenderer } from './offlineRenderer';
+import { t } from '../../i18n';
 
 export interface ExportOptions {
   format: ContainerFormat;
@@ -76,7 +77,7 @@ export async function exportVideo(
   const fps = project.settings.fps;
   const rate = fpsValue(fps);
   const total = Math.max(0, options.endFrame - options.startFrame);
-  if (total === 0) throw new Error('書き出す範囲がありません。');
+  if (total === 0) throw new Error(t('書き出す範囲がありません。'));
 
   const format =
     options.format === 'mp4'
@@ -140,7 +141,7 @@ export async function exportVideo(
     await renderer.init();
     await output.start();
     for (let i = 0; i < total; i++) {
-      if (signal.aborted) throw new ExportCanceledError('書き出しを中止しました。');
+      if (signal.aborted) throw new ExportCanceledError(t('書き出しを中止しました。'));
       await renderer.render(options.startFrame + i);
       await videoSource.add(i / rate, 1 / rate);
       // 映像と音声を交互に書き込み、メモリにためすぎないようにする

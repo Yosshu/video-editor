@@ -14,6 +14,7 @@ import {
   type Relayout,
 } from '../core/timeline/structure';
 import { commit, currentScene, getState, notify, setSelection } from '../state/store';
+import { t } from '../i18n';
 
 function editScene(label: string, fn: (scene: Draft<Scene>) => void): void {
   const { sceneId } = getState();
@@ -38,10 +39,10 @@ export function rippleDeleteSelection(): void {
   if (selection.length === 0) return;
   const { remove, moves } = rippleDelete(currentScene(), selection);
   if (remove.size === 0) {
-    notify('ロックされたレイヤーのオブジェクトは削除できません。', 'error');
+    notify(t('ロックされたレイヤーのオブジェクトは削除できません。'), 'error');
     return;
   }
-  editScene('削除して詰める', (s) => applyRelayout(s, moves, remove));
+  editScene(t('削除して詰める'), (s) => applyRelayout(s, moves, remove));
   setSelection([]);
 }
 
@@ -50,35 +51,35 @@ export function closeGapAt(frame: number, layer?: number): void {
   const scene = currentScene();
   const moves = closeGap(scene, frame, layer);
   if (!moves || moves.size === 0) {
-    notify('詰められる空白がありません（ロックされたレイヤーは動かせません）。', 'error');
+    notify(t('詰められる空白がありません（ロックされたレイヤーは動かせません）。'), 'error');
     return;
   }
   if (relayoutCollides(scene, moves)) {
-    notify('詰めると他のオブジェクトと重なるため、詰められません。', 'error');
+    notify(t('詰めると他のオブジェクトと重なるため、詰められません。'), 'error');
     return;
   }
-  editScene('空白を詰める', (s) => applyRelayout(s, moves));
+  editScene(t('空白を詰める'), (s) => applyRelayout(s, moves));
 }
 
 /** レイヤーの空白をすべて詰める */
 export function packLayerAt(layer: number): void {
   const moves = packLayer(currentScene(), layer);
   if (!moves) {
-    notify(`レイヤー ${layer} はロックされています。`, 'error');
+    notify(t('レイヤー {0} はロックされています。', layer), 'error');
     return;
   }
   if (moves.size === 0) return;
-  editScene('レイヤーの空白をすべて詰める', (s) => applyRelayout(s, moves));
+  editScene(t('レイヤーの空白をすべて詰める'), (s) => applyRelayout(s, moves));
 }
 
 /** at の位置に空のレイヤーを挿入する（下のレイヤーは中身ごとずれる） */
 export function insertLayerAt(at: number): void {
   const result = insertLayer(currentScene(), at);
   if (!result) {
-    notify('最後のレイヤーにオブジェクトがあるため、挿入できません。', 'error');
+    notify(t('最後のレイヤーにオブジェクトがあるため、挿入できません。'), 'error');
     return;
   }
-  editScene('レイヤーの挿入', (s) => {
+  editScene(t('レイヤーの挿入'), (s) => {
     applyRelayout(s, result.moves);
     s.layers = result.layers;
   });
@@ -88,10 +89,10 @@ export function insertLayerAt(at: number): void {
 export function deleteLayerAt(at: number): void {
   const result = deleteLayer(currentScene(), at);
   if (!result) {
-    notify(`レイヤー ${at} はロックされているため、削除できません。`, 'error');
+    notify(t('レイヤー {0} はロックされているため、削除できません。', at), 'error');
     return;
   }
-  editScene('レイヤーの削除', (s) => {
+  editScene(t('レイヤーの削除'), (s) => {
     applyRelayout(s, result.moves, result.remove);
     s.layers = result.layers;
   });
@@ -100,7 +101,7 @@ export function deleteLayerAt(at: number): void {
 
 /** レイヤー index から下 count レイヤーをまとまりにする（0 で解除） */
 export function setLayerFold(index: number, count: number): void {
-  editScene(count > 0 ? 'レイヤーをまとめる' : 'まとまりを解除', (s) => {
+  editScene(count > 0 ? t('レイヤーをまとめる') : t('まとまりを解除'), (s) => {
     let layer = s.layers.find((l) => l.index === index);
     if (!layer) {
       layer = { index };
@@ -125,7 +126,7 @@ export function setLayerFold(index: number, count: number): void {
 
 /** まとまりを折りたたむ／開く（表示の切り替えだが、保存されるので履歴にも残す） */
 export function toggleLayerCollapsed(index: number): void {
-  editScene('まとまりの折りたたみ', (s) => {
+  editScene(t('まとまりの折りたたみ'), (s) => {
     const layer = s.layers.find((l) => l.index === index);
     if (!layer?.fold) return;
     if (layer.collapsed) delete layer.collapsed;
@@ -143,7 +144,7 @@ export function inheritFromPrevious(objectId: string): void {
   if (!obj) return;
   const prev = previousOnLayer(scene, obj);
   if (!prev) {
-    notify('同じレイヤーの前にオブジェクトがありません。', 'error');
+    notify(t('同じレイヤーの前にオブジェクトがありません。'), 'error');
     return;
   }
   const prevValues = resolveParams(prev, prev.length - 1);
@@ -154,10 +155,10 @@ export function inheritFromPrevious(objectId: string): void {
   const current = resolveParams(obj, 0);
   const changes = targets.filter((p) => prevValues[p.id] !== current[p.id]);
   if (changes.length === 0) {
-    notify('引き継ぐ値はありません（すでに同じ値です）。');
+    notify(t('引き継ぐ値はありません（すでに同じ値です）。'));
     return;
   }
-  editScene('前のオブジェクトの値を引き継ぐ', (s) => {
+  editScene(t('前のオブジェクトの値を引き継ぐ'), (s) => {
     const o = s.objects.find((x) => x.id === objectId);
     if (!o) return;
     for (const p of changes)

@@ -6,6 +6,7 @@ import { currentScene, useEditor, type PreviewQuality } from '../../state/store'
 import { useUi } from '../../state/ui';
 import { togglePreviewFullscreen } from './fullscreen';
 import { LevelMeter } from './LevelMeter';
+import { t } from '../../i18n';
 
 interface Props {
   quality: PreviewQuality;
@@ -31,8 +32,8 @@ export function TransportBar({ quality, onQuality }: Props) {
         type="button"
         className="icon-button"
         onClick={step(jumpToStart)}
-        aria-label="先頭へ"
-        title="先頭へ（Home）"
+        aria-label={t('先頭へ')}
+        title={t('先頭へ（Home）')}
       >
         ⏮
       </button>
@@ -40,8 +41,8 @@ export function TransportBar({ quality, onQuality }: Props) {
         type="button"
         className="icon-button"
         onClick={step(() => stepFrames(-1))}
-        aria-label="1フレーム戻る"
-        title="1フレーム戻る（←）"
+        aria-label={t('1フレーム戻る')}
+        title={t('1フレーム戻る（←）')}
       >
         ◀︎
       </button>
@@ -49,8 +50,8 @@ export function TransportBar({ quality, onQuality }: Props) {
         type="button"
         className="icon-button play-button"
         onClick={() => playback.toggle()}
-        aria-label={playing ? '停止' : '再生'}
-        title="再生 / 停止（Space）"
+        aria-label={playing ? t('停止') : t('再生')}
+        title={t('再生 / 停止（Space）')}
       >
         {playing ? '⏸' : '▶︎'}
       </button>
@@ -58,8 +59,8 @@ export function TransportBar({ quality, onQuality }: Props) {
         type="button"
         className="icon-button"
         onClick={step(() => stepFrames(1))}
-        aria-label="1フレーム進む"
-        title="1フレーム進む（→）"
+        aria-label={t('1フレーム進む')}
+        title={t('1フレーム進む（→）')}
       >
         ▶︎|
       </button>
@@ -67,8 +68,8 @@ export function TransportBar({ quality, onQuality }: Props) {
         type="button"
         className="icon-button"
         onClick={step(jumpToEnd)}
-        aria-label="末尾へ"
-        title="末尾へ（End）"
+        aria-label={t('末尾へ')}
+        title={t('末尾へ（End）')}
       >
         ⏭
       </button>
@@ -77,7 +78,7 @@ export function TransportBar({ quality, onQuality }: Props) {
       </span>
       <LevelMeter />
       <span className="guide-toggles">
-        <label title="三分割線と中心を表示">
+        <label title={t('三分割線と中心を表示')}>
           <input
             type="checkbox"
             checked={guides.grid}
@@ -85,9 +86,9 @@ export function TransportBar({ quality, onQuality }: Props) {
               useUi.setState({ previewGuides: { ...guides, grid: e.target.checked } })
             }
           />
-          グリッド
+          {t('グリッド')}
         </label>
-        <label title="テロップを収める目安の枠を表示">
+        <label title={t('テロップを収める目安の枠を表示')}>
           <input
             type="checkbox"
             checked={guides.safeArea}
@@ -95,16 +96,16 @@ export function TransportBar({ quality, onQuality }: Props) {
               useUi.setState({ previewGuides: { ...guides, safeArea: e.target.checked } })
             }
           />
-          セーフエリア
+          {t('セーフエリア')}
         </label>
       </span>
       <label className="quality">
-        画質
+        {t('画質')}
         <select
           value={quality}
           onChange={(e) => onQuality(Number(e.target.value) as PreviewQuality)}
         >
-          <option value={1}>等倍</option>
+          <option value={1}>{t('等倍')}</option>
           <option value={0.5}>1/2</option>
           <option value={0.25}>1/4</option>
         </select>
@@ -113,8 +114,8 @@ export function TransportBar({ quality, onQuality }: Props) {
         type="button"
         className="icon-button"
         onClick={() => void togglePreviewFullscreen()}
-        aria-label="全画面表示"
-        title="全画面表示の切り替え（F）"
+        aria-label={t('全画面表示')}
+        title={t('全画面表示の切り替え（F）')}
       >
         ⛶
       </button>

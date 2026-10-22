@@ -15,6 +15,7 @@ import {
 import { useUi } from '../../state/ui';
 import { FULLSCREEN_ATTR } from './fullscreen';
 import { TransportBar } from './TransportBar';
+import { t } from '../../i18n';
 
 interface Size {
   width: number;
@@ -222,10 +223,14 @@ export function PreviewPanel() {
   };
 
   return (
-    <section className="panel preview-panel" aria-label="プレビュー" {...{ [FULLSCREEN_ATTR]: '' }}>
+    <section
+      className="panel preview-panel"
+      aria-label={t('プレビュー')}
+      {...{ [FULLSCREEN_ATTR]: '' }}
+    >
       <div className="preview-area" ref={containerRef}>
         {error ? (
-          <p className="error-text">プレビューを表示できません：{error}</p>
+          <p className="error-text">{t('プレビューを表示できません：{0}', error)}</p>
         ) : (
           <div className="preview-stage" style={{ width: displayW, height: displayH }}>
             <canvas

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
 import { checkAutosave, openProjectFile, startAutosave } from '../../app/projectFile';
 import { isProjectFileName } from '../../engine/media/detect';
@@ -16,6 +16,7 @@ import { UpdateBanner } from './UpdateBanner';
 import { Notices } from './Notices';
 import { handleShortcut } from './shortcuts';
 import { Splitter } from './Splitter';
+import { t, useLocale } from '../../i18n';
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -24,6 +25,8 @@ export function Editor() {
   const [rightW, setRightW] = useState(300);
   const [timelineH, setTimelineH] = useState(() => Math.round(window.innerHeight * 0.38));
   const [dragOver, setDragOver] = useState(false);
+  // 言語を切り替えたら、画面の部品を作り直して文言を入れ替える（起動時の処理はやり直さない）
+  const locale = useLocale((s) => s.locale);
 
   useEffect(() => {
     setupPreviewAudio();
@@ -82,34 +85,36 @@ export function Editor() {
         });
       }}
     >
-      <MenuBar />
-      <MediaBin />
-      <Splitter
-        direction="vertical"
-        area="s1"
-        label="素材一覧の幅"
-        onDrag={(d) => setLeftW((w) => clamp(w + d, 140, 600))}
-      />
-      <PreviewPanel />
-      <Splitter
-        direction="vertical"
-        area="s2"
-        label="設定パネルの幅"
-        onDrag={(d) => setRightW((w) => clamp(w - d, 200, 700))}
-      />
-      <Inspector />
-      <Splitter
-        direction="horizontal"
-        area="s3"
-        label="タイムラインの高さ"
-        onDrag={(d) => setTimelineH((h) => clamp(h - d, 120, window.innerHeight - 200))}
-      />
-      <Timeline />
-      <ContextMenu />
-      <DialogHost />
-      <Notices />
-      <BusyOverlay />
-      <UpdateBanner />
+      <Fragment key={locale}>
+        <MenuBar />
+        <MediaBin />
+        <Splitter
+          direction="vertical"
+          area="s1"
+          label={t('素材一覧の幅')}
+          onDrag={(d) => setLeftW((w) => clamp(w + d, 140, 600))}
+        />
+        <PreviewPanel />
+        <Splitter
+          direction="vertical"
+          area="s2"
+          label={t('設定パネルの幅')}
+          onDrag={(d) => setRightW((w) => clamp(w - d, 200, 700))}
+        />
+        <Inspector />
+        <Splitter
+          direction="horizontal"
+          area="s3"
+          label={t('タイムラインの高さ')}
+          onDrag={(d) => setTimelineH((h) => clamp(h - d, 120, window.innerHeight - 200))}
+        />
+        <Timeline />
+        <ContextMenu />
+        <DialogHost />
+        <Notices />
+        <BusyOverlay />
+        <UpdateBanner />
+      </Fragment>
     </div>
   );
 }

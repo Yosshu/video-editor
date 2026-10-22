@@ -16,6 +16,7 @@ import type { Ease, ParamMap, ParamValue, TimelineObject } from '../core/model/t
 import { getObjectDef } from '../core/objects/definitions';
 import type { NumberParamDef, ParamDef } from '../core/params/defs';
 import { commit, currentScene, getState, setPlayhead } from '../state/store';
+import { t } from '../i18n';
 
 function findObject(objectId: string): TimelineObject | undefined {
   return currentScene().objects.find((o) => o.id === objectId);
@@ -74,17 +75,17 @@ export function setParamAtPlayhead(
 ): void {
   const obj = findObject(objectId);
   if (!obj) return;
-  const t = localFrameOf(obj);
+  const at = localFrameOf(obj);
   updateParams(
     objectId,
-    'パラメータの変更',
+    t('パラメータの変更'),
     (params) => {
       const current = params[paramId];
       const next =
-        typeof value === 'number' && isAnimated(current) ? setValueAt(current, t, value) : value;
+        typeof value === 'number' && isAnimated(current) ? setValueAt(current, at, value) : value;
       return { ...params, [paramId]: next };
     },
-    { mergeKey: `param:${objectId}:${effectId ?? ''}:${paramId}:${t}`, effectId },
+    { mergeKey: `param:${objectId}:${effectId ?? ''}:${paramId}:${at}`, effectId },
   );
 }
 
@@ -98,13 +99,13 @@ export function toggleKeyAtPlayhead(
   const obj = findObject(objectId);
   const params = obj && paramsOf(obj, effectId);
   if (!obj || !params) return;
-  const t = localFrameOf(obj);
+  const at = localFrameOf(obj);
   const value = params[paramId];
-  if (hasKeyAt(value, t) && isAnimated(value)) {
+  if (hasKeyAt(value, at) && isAnimated(value)) {
     updateParams(
       objectId,
-      'キーフレームの削除',
-      (p) => ({ ...p, [paramId]: removeKeyAt(value, t) }),
+      t('キーフレームの削除'),
+      (p) => ({ ...p, [paramId]: removeKeyAt(value, at) }),
       {
         effectId,
       },
@@ -112,8 +113,8 @@ export function toggleKeyAtPlayhead(
   } else {
     updateParams(
       objectId,
-      'キーフレームの追加',
-      (p) => ({ ...p, [paramId]: addKeyAt(value, t, fallback) }),
+      t('キーフレームの追加'),
+      (p) => ({ ...p, [paramId]: addKeyAt(value, at, fallback) }),
       { effectId },
     );
   }
@@ -127,11 +128,11 @@ export function clearParamAnimation(
 ): void {
   const obj = findObject(objectId);
   if (!obj) return;
-  const t = localFrameOf(obj);
+  const at = localFrameOf(obj);
   updateParams(
     objectId,
-    'アニメーションの解除',
-    (p) => ({ ...p, [paramId]: clearAnimation(p[paramId], t, fallback) }),
+    t('アニメーションの解除'),
+    (p) => ({ ...p, [paramId]: clearAnimation(p[paramId], at, fallback) }),
     { effectId },
   );
 }
@@ -145,13 +146,13 @@ export function setEaseAtPlayhead(
   const obj = findObject(objectId);
   const value = obj && paramsOf(obj, effectId)?.[paramId];
   if (!obj || !isAnimated(value)) return;
-  const t = localFrameOf(obj);
+  const at = localFrameOf(obj);
   updateParams(
     objectId,
-    '変化の仕方の変更',
-    (p) => ({ ...p, [paramId]: setEaseAt(value, t, ease) }),
+    t('変化の仕方の変更'),
+    (p) => ({ ...p, [paramId]: setEaseAt(value, at, ease) }),
     {
-      mergeKey: `ease:${objectId}:${effectId ?? ''}:${paramId}:${t}`,
+      mergeKey: `ease:${objectId}:${effectId ?? ''}:${paramId}:${at}`,
       effectId,
     },
   );
@@ -167,8 +168,8 @@ export function jumpToKey(
   const obj = findObject(objectId);
   const value = obj && paramsOf(obj, effectId)?.[paramId];
   if (!obj || !isAnimated(value)) return;
-  const t = neighborKey(value, localFrameOf(obj), direction);
-  if (t !== null) setPlayhead(obj.start + Math.min(Math.max(0, t), obj.length - 1));
+  const at = neighborKey(value, localFrameOf(obj), direction);
+  if (at !== null) setPlayhead(obj.start + Math.min(Math.max(0, at), obj.length - 1));
 }
 
 /** オブジェクトとエフェクトのパラメータすべてに同じ処理をする（中間点の操作） */
@@ -190,17 +191,17 @@ function updateAllParams(
 export function addMidpointAtPlayhead(objectId: string): void {
   const obj = findObject(objectId);
   if (!obj) return;
-  const t = localFrameOf(obj);
+  const at = localFrameOf(obj);
   const { defaults, animatable } = numberInfo(getObjectDef(obj.type).params);
   updateAllParams(
     objectId,
-    '中間点の追加',
-    (p) => addMidpoint(p, t, defaults, animatable),
+    t('中間点の追加'),
+    (p) => addMidpoint(p, at, defaults, animatable),
     (p, type) => {
       // エフェクトは、すでに動いているパラメータにだけキーを打つ
       const info = numberInfo(getEffectDef(type)?.params ?? []);
       const moving = info.animatable.filter((id) => isAnimated(p[id]));
-      return moving.length > 0 ? addMidpoint(p, t, info.defaults, moving) : p;
+      return moving.length > 0 ? addMidpoint(p, at, info.defaults, moving) : p;
     },
   );
 }
@@ -208,12 +209,12 @@ export function addMidpointAtPlayhead(objectId: string): void {
 export function removeMidpointAtPlayhead(objectId: string): void {
   const obj = findObject(objectId);
   if (!obj) return;
-  const t = localFrameOf(obj);
+  const at = localFrameOf(obj);
   updateAllParams(
     objectId,
-    '中間点の削除',
-    (p) => removeMidpoint(p, t),
-    (p) => removeMidpoint(p, t),
+    t('中間点の削除'),
+    (p) => removeMidpoint(p, at),
+    (p) => removeMidpoint(p, at),
   );
 }
 
@@ -223,7 +224,7 @@ export function moveMidpointOf(objectId: string, from: number, to: number): void
   const clamped = Math.min(Math.max(0, to), obj.length - 1);
   updateAllParams(
     objectId,
-    '中間点の移動',
+    t('中間点の移動'),
     (p) => moveMidpoint(p, from, clamped),
     (p) => moveMidpoint(p, from, clamped),
   );

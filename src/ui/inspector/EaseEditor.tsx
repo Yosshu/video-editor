@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { applyEase } from '../../core/animation/ease';
 import type { Ease } from '../../core/model/types';
+import { t } from '../../i18n';
 
 const SIZE = 140;
 const PAD = 20;
@@ -55,7 +56,13 @@ export function EaseEditor({ ease, onChange }: Props) {
 
   const custom = typeof ease === 'object' && 'bezier' in ease;
   return (
-    <svg ref={ref} className="ease-editor" width={SIZE} height={SIZE} aria-label="イージング曲線">
+    <svg
+      ref={ref}
+      className="ease-editor"
+      width={SIZE}
+      height={SIZE}
+      aria-label={t('イージング曲線')}
+    >
       <rect x={PAD} y={PAD} width={inner} height={inner} className="ease-frame" />
       <polyline points={points.join(' ')} className="ease-curve" />
       {custom && (

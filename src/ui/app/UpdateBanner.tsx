@@ -1,4 +1,5 @@
 import { applyUpdate, usePwa } from '../../app/pwa';
+import { t } from '../../i18n';
 
 /** 新しいバージョンが届いたことを知らせる */
 export function UpdateBanner() {
@@ -6,12 +7,12 @@ export function UpdateBanner() {
   if (!ready) return null;
   return (
     <div className="update-banner" role="status">
-      新しいバージョンがあります。
+      {t('新しいバージョンがあります。')}
       <button type="button" className="primary" onClick={applyUpdate}>
-        更新して読み込み直す
+        {t('更新して読み込み直す')}
       </button>
       <button type="button" onClick={() => usePwa.setState({ updateReady: false })}>
-        あとで
+        {t('あとで')}
       </button>
     </div>
   );
