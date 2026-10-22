@@ -29,7 +29,8 @@ export interface VideoFrameRef {
 
 /** 素材の中身（画像・動画フレーム）を提供する */
 export interface MediaProvider {
-  getImage(assetId: string): ImageBitmap | undefined;
+  /** 画像。アニメーション画像なら素材内の時刻 time（秒）のコマ */
+  getImage(assetId: string, time?: number): ImageBitmap | undefined;
   /** instanceKey はオブジェクトの識別子（入れ子のシーンでは親のオブジェクト ID を前につける） */
   getVideoFrame(
     instanceKey: string,
@@ -175,11 +176,12 @@ export class Compositor {
     };
     switch (obj.type) {
       case 'image': {
-        const bitmap = obj.assetId ? media.getImage(obj.assetId) : undefined;
+        const bitmap = obj.assetId ? media.getImage(obj.assetId, item.sourceTime) : undefined;
         if (!bitmap) return null;
         return {
           ...base,
-          key: `asset:${obj.assetId}`,
+          // アニメーション画像はオブジェクトごとに違うコマを表示するので、テクスチャを分ける
+          key: item.sourceTime === undefined ? `asset:${obj.assetId}` : id,
           source: bitmap,
           version: bitmap,
           mipmap: true,

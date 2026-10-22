@@ -73,9 +73,8 @@ export function addAssetObjects(assets: Asset[], layer: number, frame: number): 
       asset.kind === 'video' ? 'video' : asset.kind === 'audio' ? 'audio' : 'image';
     if (asset.kind === 'font' || asset.kind === 'lut') continue;
     const length =
-      asset.durationSec && (type === 'video' || type === 'audio')
-        ? Math.max(1, secondsToFrames(asset.durationSec, fps))
-        : undefined;
+      // アニメーション画像も 1 回分の長さで置く
+      asset.durationSec ? Math.max(1, secondsToFrames(asset.durationSec, fps)) : undefined;
     const obj = addObject(type, layer, at, { assetId: asset.id, length });
     if (obj) {
       ids.push(obj.id);

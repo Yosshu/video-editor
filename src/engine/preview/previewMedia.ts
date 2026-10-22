@@ -8,7 +8,7 @@ export function createPreviewMedia(
   getVideoFrame: MediaProvider['getVideoFrame'] = () => undefined,
 ): MediaProvider {
   return {
-    getImage: (id) => assetRegistry.getImage(id),
+    getImage: (id, time) => assetRegistry.getImage(id, time),
     getVideoFrame,
     assetDuration: (id) => getState().project.assets.find((a) => a.id === id)?.durationSec,
     getPeaks: (id) => peekPeaks(id) ?? undefined,

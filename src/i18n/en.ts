@@ -832,4 +832,5 @@ export const EN: Record<string, string> = {
   'ファイルを読み込む…': 'Load file…',
   'LUT はタイムラインには置かず、エフェクト「LUT（色の変換表）」で選んで使います。':
     'LUTs aren\'t placed on the timeline. Choose them in the "LUT (color lookup table)" effect.',
+  アニメーション画像: 'Animated image',
 };

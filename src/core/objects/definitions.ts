@@ -20,7 +20,7 @@ export interface ObjectTypeDef {
 }
 
 /** 設定パネルで、最初は閉じておく見出し */
-export const COLLAPSED_GROUPS = ['3D', '登場・退場'];
+export const COLLAPSED_GROUPS = ['3D', '登場・退場', 'アニメーション画像'];
 
 export const BLEND_MODES = [
   { value: 'normal', label: '通常' },
@@ -395,7 +395,32 @@ export const OBJECT_TYPES: Record<ObjectType, ObjectTypeDef> = {
     visual: true,
     audio: false,
     assetKind: 'image',
-    params: [...TRANSFORM_PARAMS, ...FADE_PARAMS, ...TRANSITION_PARAMS],
+    params: [
+      ...TRANSFORM_PARAMS,
+      // アニメーション画像（GIF・APNG・WebP）のときだけ使う
+      {
+        id: 'speed',
+        label: '再生速度',
+        kind: 'number',
+        default: 100,
+        min: 1,
+        max: 1600,
+        sliderMin: 10,
+        sliderMax: 400,
+        step: 1,
+        unit: '%',
+        group: 'アニメーション画像',
+      },
+      {
+        id: 'loop',
+        label: 'ループ再生',
+        kind: 'boolean',
+        default: true,
+        group: 'アニメーション画像',
+      },
+      ...FADE_PARAMS,
+      ...TRANSITION_PARAMS,
+    ],
   },
   audio: {
     type: 'audio',

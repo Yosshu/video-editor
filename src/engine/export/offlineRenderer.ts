@@ -29,7 +29,7 @@ export class OfflineRenderer {
     this.renderer.setSize(scene.width, scene.height, width / scene.width, { width, height });
     const durations = new Map(project.assets.map((a) => [a.id, a.durationSec]));
     this.media = {
-      getImage: (id) => assetRegistry.getImage(id),
+      getImage: (id, time) => assetRegistry.getImage(id, time),
       getVideoFrame: (key, assetId, time) => {
         this.requests?.push({ key, assetId, time });
         return this.frames.get(key);

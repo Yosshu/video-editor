@@ -362,6 +362,11 @@ export function evaluateFrame(scene: Scene, frame: number, ctx: EvaluateContext)
       Math.min(1, (Number(params.opacity) / 100) * fade * motion.opacity),
     );
     const item: VisualItem = { object, def, localFrame, params, opacity, effects, motion };
+    if (object.type === 'image' && object.assetId) {
+      // アニメーション画像なら素材内の時刻（静止画は素材の長さがないので計算しない）
+      const assetDuration = ctx.assetDuration?.(object.assetId);
+      if (assetDuration) item.sourceTime = sourceTimeAt(params, localSeconds, assetDuration);
+    }
     if (object.type === 'video') {
       const assetDuration = object.assetId ? ctx.assetDuration?.(object.assetId) : undefined;
       item.sourceTime = sourceTimeAt(params, localSeconds, assetDuration);
