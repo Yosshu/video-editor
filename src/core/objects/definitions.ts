@@ -559,7 +559,7 @@ const PARTICLE_PARAMS: ParamDef[] = [
     default: '#ff6b6b',
     group: '粒',
   },
-  { id: 'fadeOut', label: 'だんだん薄くする', kind: 'boolean', default: true, group: '粒' },
+  { id: 'fadeAway', label: 'だんだん薄くする', kind: 'boolean', default: true, group: '粒' },
   {
     id: 'spin',
     label: '回転の速さ',

@@ -15,7 +15,7 @@ const base = {
   sizeRandom: 0,
   sizeEnd: 100,
   spin: 0,
-  fadeOut: true,
+  fadeAway: true,
   prewarm: false,
   seed: 1,
 };

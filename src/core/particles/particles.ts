@@ -49,7 +49,7 @@ export function simulateParticles(p: ResolvedParams, time: number): Particle[] {
   const sizeRandom = Math.min(1, Math.max(0, num(p.sizeRandom, 50) / 100));
   const sizeEnd = Math.max(0, num(p.sizeEnd, 100) / 100);
   const spin = num(p.spin, 0);
-  const fade = p.fadeOut !== false;
+  const fade = p.fadeAway !== false;
 
   const last = Math.floor(t * rate + 1e-9);
   const first = Math.max(0, Math.ceil((t - life) * rate - 1e-9), last - MAX_PARTICLES + 1);
