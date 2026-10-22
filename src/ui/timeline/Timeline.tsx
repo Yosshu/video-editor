@@ -50,6 +50,8 @@ import { openContextMenu, openDialog, useUi } from '../../state/ui';
 import { usePeaks, useThumbnail } from '../common/mediaHooks';
 import { ASSET_DRAG_TYPE } from '../media-bin/MediaBin';
 import { addMarker, addMarkerAtPlayhead } from '../../app/markerActions';
+import { addObjectFromPreset, canAddFromPreset } from '../../app/presetActions';
+import { usePresets } from '../../state/presets';
 import { markerSnapPoints } from '../../core/timeline/markers';
 import { BeatGridLines, MarkerLines, RulerMarkers } from './Markers';
 import { SceneTabs } from './SceneTabs';
@@ -711,6 +713,13 @@ export function Timeline() {
       { label: 'グループ制御を追加（下のレイヤーをまとめて動かす）', action: add('group') },
       { label: '時間制御を追加（下のレイヤーの時間を変える）', action: add('timeControl') },
       { label: 'カメラ制御を追加（下のレイヤーを 3D で撮影）', action: add('camera') },
+      ...usePresets
+        .getState()
+        .objects.filter(canAddFromPreset)
+        .map((p) => ({
+          label: `プリセットから追加：${p.name}`,
+          action: () => addObjectFromPreset(p.id, layer, frame),
+        })),
       {
         label: '動画・画像・音声ファイルを追加…',
         action: async () => {

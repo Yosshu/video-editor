@@ -10,6 +10,15 @@ const finite = z.number().refine(Number.isFinite, '数値が不正です');
 const easeSchema = z.union([
   z.string().max(64),
   z.object({ bezier: z.tuple([finite, finite, finite, finite]) }).loose(),
+  z
+    .object({
+      special: z.enum(['random', 'repeat', 'shake']),
+      period: finite,
+      amount: finite.optional(),
+      smooth: z.boolean().optional(),
+      seed: finite.optional(),
+    })
+    .loose(),
 ]);
 
 const keyframeSchema = z
@@ -27,9 +36,9 @@ const paramValueSchema = z.union([
   z.object({ keys: z.array(keyframeSchema).max(10_000) }).loose(),
 ]);
 
-const paramMapSchema = z.record(z.string().max(128), paramValueSchema);
+export const paramMapSchema = z.record(z.string().max(128), paramValueSchema);
 
-const effectSchema = z
+export const effectSchema = z
   .object({
     id: z.string().max(128),
     type: z.string().max(128),

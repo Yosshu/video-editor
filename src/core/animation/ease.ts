@@ -1,4 +1,4 @@
-import type { Ease, EasePreset } from '../model/types';
+import type { Ease, EasePreset, SpecialEase } from '../model/types';
 
 type EaseFn = (t: number) => number;
 
@@ -87,7 +87,7 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): Eas
 export function applyEase(ease: Ease | undefined, t: number): number {
   if (ease === undefined || ease === 'linear') return t;
   if (ease === 'hold') return 0;
-  if (typeof ease === 'object') return cubicBezier(...ease.bezier)(t);
+  if (typeof ease === 'object') return 'bezier' in ease ? cubicBezier(...ease.bezier)(t) : t;
   const fn = EASE_PRESETS[ease];
   return fn ? fn(t) : t;
 }
@@ -116,3 +116,57 @@ export const EASE_OPTIONS: { value: string; label: string }[] = [
   { value: 'easeOutBounce', label: 'バウンド' },
   { value: 'easeOutElastic', label: '弾む' },
 ];
+
+export function isSpecialEase(ease: Ease | undefined): ease is SpecialEase {
+  return typeof ease === 'object' && 'special' in ease;
+}
+
+/** 整数から 0 以上 1 未満の値を作る（同じ入力なら同じ値） */
+export function hash01(seed: number, n: number): number {
+  let h = (Math.imul(seed | 0, 0x9e3779b1) ^ Math.imul(n | 0, 0x85ebca77)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x7feb352d) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x846ca68b) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h / 4294967296;
+}
+
+const smoothstep = (x: number) => x * x * (3 - 2 * x);
+
+/** 間隔ごとに変わる乱数（smooth なら間をなめらかにつなぐ）。0〜1 */
+function steppedRandom(seed: number, local: number, period: number, smooth: boolean): number {
+  const x = local / period;
+  const n = Math.floor(x);
+  const a = hash01(seed, n);
+  if (!smooth) return a;
+  return a + (hash01(seed, n + 1) - a) * smoothstep(x - n);
+}
+
+/**
+ * 特殊な変化の値。from・to は区間の両端のキーの値、local は区間の先頭からのフレーム、span は区間の長さ
+ */
+export function specialValue(
+  ease: SpecialEase,
+  from: number,
+  to: number,
+  local: number,
+  span: number,
+): number {
+  const period = Math.max(1, ease.period);
+  const seed = ease.seed ?? 1;
+  const smooth = ease.smooth === true;
+  switch (ease.special) {
+    case 'random':
+      return from + (to - from) * steppedRandom(seed, local, period, smooth);
+    case 'repeat': {
+      // from → to → from を 1 周期とする
+      const phase = (local / period) % 1;
+      const p = smooth ? (1 - Math.cos(phase * 2 * Math.PI)) / 2 : 1 - Math.abs(phase * 2 - 1);
+      return from + (to - from) * p;
+    }
+    case 'shake': {
+      const base = from + (to - from) * (span > 0 ? local / span : 0);
+      const amount = ease.amount ?? 10;
+      return base + amount * (steppedRandom(seed, local, period, smooth) * 2 - 1);
+    }
+  }
+}

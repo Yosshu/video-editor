@@ -14,7 +14,7 @@ interface Props {
 export function EaseEditor({ ease, onChange }: Props) {
   const ref = useRef<SVGSVGElement>(null);
   const bezier: [number, number, number, number] =
-    typeof ease === 'object' ? ease.bezier : [0.25, 0.1, 0.25, 1];
+    typeof ease === 'object' && 'bezier' in ease ? ease.bezier : [0.25, 0.1, 0.25, 1];
   const inner = SIZE - PAD * 2;
   const toX = (x: number) => PAD + x * inner;
   const toY = (y: number) => PAD + (1 - y) * inner;
@@ -24,7 +24,7 @@ export function EaseEditor({ ease, onChange }: Props) {
   for (let i = 0; i <= 40; i++) {
     const x = i / 40;
     const y =
-      typeof ease === 'object' || ease === undefined
+      (typeof ease === 'object' && 'bezier' in ease) || ease === undefined
         ? applyEase({ bezier }, x)
         : applyEase(ease, x);
     points.push(`${toX(x)},${toY(y)}`);
@@ -53,7 +53,7 @@ export function EaseEditor({ ease, onChange }: Props) {
     target.addEventListener('pointerup', up);
   };
 
-  const custom = typeof ease === 'object';
+  const custom = typeof ease === 'object' && 'bezier' in ease;
   return (
     <svg ref={ref} className="ease-editor" width={SIZE} height={SIZE} aria-label="イージング曲線">
       <rect x={PAD} y={PAD} width={inner} height={inner} className="ease-frame" />

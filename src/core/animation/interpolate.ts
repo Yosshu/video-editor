@@ -1,5 +1,5 @@
 import type { Animated, Keyframe, ParamValue } from '../model/types';
-import { applyEase } from './ease';
+import { applyEase, isSpecialEase, specialValue } from './ease';
 
 export function isAnimated(value: ParamValue | undefined): value is Animated {
   return typeof value === 'object' && value !== null && Array.isArray((value as Animated).keys);
@@ -19,7 +19,8 @@ export function normalizeKeys(keys: Keyframe[]): Keyframe[] {
 /** キーフレームの時刻 t（相対フレーム）における値 */
 export function keysValueAt(keys: Keyframe[], t: number): number {
   if (keys.length === 0) return 0;
-  if (t <= keys[0].t) return keys[0].v;
+  // 特殊な変化は区間の先頭のフレームから変化させる
+  if (t < keys[0].t || (t === keys[0].t && !isSpecialEase(keys[0].ease))) return keys[0].v;
   const last = keys[keys.length - 1];
   if (t >= last.t) return last.v;
   // 二分探索で t を挟む 2 点を見つける
@@ -34,6 +35,7 @@ export function keysValueAt(keys: Keyframe[], t: number): number {
   const b = keys[hi];
   const span = b.t - a.t;
   if (span <= 0) return b.v;
+  if (isSpecialEase(a.ease)) return specialValue(a.ease, a.v, b.v, t - a.t, span);
   const p = applyEase(a.ease, (t - a.t) / span);
   return a.v + (b.v - a.v) * p;
 }

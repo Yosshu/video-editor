@@ -9,8 +9,15 @@ import {
   toggleKeyAtPlayhead,
 } from '../../app/animationActions';
 import { addEffect, moveEffect, removeEffect, setEffectEnabled } from '../../app/effectActions';
+import {
+  addEffectFromPreset,
+  applyObjectPreset,
+  saveEffectPreset,
+  saveObjectPreset,
+} from '../../app/presetActions';
+import { usePresets } from '../../state/presets';
 import { referableScenes } from '../../app/sceneActions';
-import { EASE_OPTIONS } from '../../core/animation/ease';
+import { EASE_OPTIONS, isSpecialEase } from '../../core/animation/ease';
 import { isAnimated, valueAt } from '../../core/animation/interpolate';
 import { easeAt, hasKeyAt, objectKeyTimes } from '../../core/animation/keys';
 import {
@@ -21,7 +28,13 @@ import {
 } from '../../core/effects/definitions';
 import { resolveParams } from '../../core/evaluate/evaluate';
 import { formatTimecode, fpsValue } from '../../core/model/time';
-import type { Ease, EffectInstance, ParamMap, TimelineObject } from '../../core/model/types';
+import type {
+  Ease,
+  EffectInstance,
+  ParamMap,
+  SpecialEase,
+  TimelineObject,
+} from '../../core/model/types';
 import { COLLAPSED_GROUPS, getObjectDef } from '../../core/objects/definitions';
 import type { NumberParamDef, ParamDef, SceneParamDef } from '../../core/params/defs';
 import { currentScene, useEditor } from '../../state/store';
@@ -89,12 +102,27 @@ function KeyControls({ target, def }: { target: Target; def: NumberParamDef }) {
   );
 }
 
+const SPECIAL_OPTIONS: { value: SpecialEase['special']; label: string }[] = [
+  { value: 'random', label: 'ランダム（2 つの値の間）' },
+  { value: 'repeat', label: '反復（2 つの値を往復）' },
+  { value: 'shake', label: '振動（変化しながら揺れる）' },
+];
+
 function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
   const { obj, effectId, params, local } = target;
   const value = params[def.id];
   if (!isAnimated(value) || value.keys.length < 2) return null;
   const ease = easeAt(value, local);
-  const selectValue = ease === undefined ? 'linear' : typeof ease === 'object' ? 'bezier' : ease;
+  const special = isSpecialEase(ease) ? ease : null;
+  const selectValue =
+    ease === undefined
+      ? 'linear'
+      : special
+        ? special.special
+        : typeof ease === 'object'
+          ? 'bezier'
+          : ease;
+  const setEase = (e: Ease) => setEaseAtPlayhead(obj.id, def.id, e, effectId);
   return (
     <div className="ease-row">
       <label className="field-label">
@@ -104,12 +132,16 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
           aria-label={`${def.label}の変化の仕方`}
           onChange={(e) => {
             const v = e.target.value;
-            setEaseAtPlayhead(
-              obj.id,
-              def.id,
-              v === 'bezier' ? { bezier: [0.25, 0.1, 0.25, 1] } : (v as Ease),
-              effectId,
-            );
+            if (v === 'bezier') setEase({ bezier: [0.25, 0.1, 0.25, 1] });
+            else if (SPECIAL_OPTIONS.some((o) => o.value === v))
+              setEase({
+                special: v as SpecialEase['special'],
+                period: v === 'repeat' ? 30 : 4,
+                // 同じ設定の別のパラメータと同じ動きにならないよう、種を変える
+                seed: Math.floor(Math.random() * 1_000_000),
+                ...(v === 'shake' ? { amount: 10 } : {}),
+              });
+            else setEase(v as Ease);
           }}
         >
           {EASE_OPTIONS.map((o) => (
@@ -118,6 +150,13 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
             </option>
           ))}
           <option value="bezier">カスタム（曲線を編集）</option>
+          <optgroup label="特殊な変化">
+            {SPECIAL_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </optgroup>
         </select>
       </label>
       <button
@@ -127,8 +166,58 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
       >
         アニメーションを解除
       </button>
-      {selectValue === 'bezier' && (
-        <EaseEditor ease={ease} onChange={(e) => setEaseAtPlayhead(obj.id, def.id, e, effectId)} />
+      {selectValue === 'bezier' && <EaseEditor ease={ease} onChange={setEase} />}
+      {special && (
+        <div className="special-ease">
+          <label>
+            {special.special === 'repeat' ? '周期' : '間隔'}
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={special.period}
+              aria-label={`${def.label}の${special.special === 'repeat' ? '周期' : '間隔'}（フレーム）`}
+              onChange={(e) => {
+                const v = Math.round(Number(e.target.value));
+                if (v >= 1) setEase({ ...special, period: v });
+              }}
+            />
+            フレーム
+          </label>
+          {special.special === 'shake' && (
+            <label>
+              揺れ幅
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={special.amount ?? 10}
+                aria-label={`${def.label}の揺れ幅`}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (v >= 0) setEase({ ...special, amount: v });
+                }}
+              />
+            </label>
+          )}
+          <label>
+            <input
+              type="checkbox"
+              checked={special.smooth === true}
+              onChange={(e) => setEase({ ...special, smooth: e.target.checked })}
+            />
+            なめらか
+          </label>
+          {special.special !== 'repeat' && (
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => setEase({ ...special, seed: Math.floor(Math.random() * 1_000_000) })}
+            >
+              別の動きにする
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -245,6 +334,21 @@ function EffectCard({
           {def?.label ?? `${effect.type}（このバージョンでは使えません）`}
         </span>
         <span className="effect-buttons">
+          {def && !disabled && (
+            <button
+              type="button"
+              className="key-button"
+              aria-label={`${def.label}の設定をプリセットに保存`}
+              title="この設定をプリセットに保存"
+              onClick={(e) => {
+                e.preventDefault();
+                const name = window.prompt('プリセットの名前', def.label);
+                if (name) saveEffectPreset(obj.id, effect.id, name);
+              }}
+            >
+              ☆
+            </button>
+          )}
           <button
             type="button"
             className="key-button"
@@ -307,6 +411,9 @@ function EffectsSection({
   const def = getObjectDef(obj.type);
   // 映像を持つなら映像エフェクト、音声を持つなら音声エフェクトを選べる
   const available = EFFECTS.filter((d) => (effectDomain(d) === 'audio' ? def.audio : def.visual));
+  const presets = usePresets((s) => s.effects).filter((p) =>
+    available.some((d) => d.type === p.type),
+  );
   return (
     <details open className="param-group effects-section">
       <summary>エフェクト{obj.effects.length > 0 ? `（${obj.effects.length}）` : ''}</summary>
@@ -327,7 +434,9 @@ function EffectsSection({
           aria-label="エフェクトを追加"
           value=""
           onChange={(e) => {
-            if (e.target.value) addEffect(obj.id, e.target.value);
+            const v = e.target.value;
+            if (v.startsWith('preset:')) addEffectFromPreset(obj.id, v.slice(7));
+            else if (v) addEffect(obj.id, v);
           }}
         >
           <option value="">＋ エフェクトを追加…</option>
@@ -342,6 +451,15 @@ function EffectsSection({
                 ))}
             </optgroup>
           ))}
+          {presets.length > 0 && (
+            <optgroup label="プリセット">
+              {presets.map((p) => (
+                <option key={p.id} value={`preset:${p.id}`}>
+                  {p.name}（{getEffectDef(p.type)?.label ?? p.type}）
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       )}
       {obj.type === 'filter' && obj.effects.length === 0 && (
@@ -350,6 +468,37 @@ function EffectsSection({
         </p>
       )}
     </details>
+  );
+}
+
+/** オブジェクトの設定をプリセットに保存・適用する */
+function ObjectPresetMenu({ obj }: { obj: TimelineObject }) {
+  const presets = usePresets((s) => s.objects).filter((p) => p.type === obj.type);
+  return (
+    <select
+      className="preset-menu"
+      aria-label="プリセット"
+      value=""
+      onChange={(e) => {
+        const v = e.target.value;
+        if (v === 'save') {
+          const name = window.prompt('プリセットの名前', getObjectDef(obj.type).label);
+          if (name) saveObjectPreset(obj.id, name);
+        } else if (v) applyObjectPreset(obj.id, v);
+      }}
+    >
+      <option value="">プリセット…</option>
+      <option value="save">この設定をプリセットに保存…</option>
+      {presets.length > 0 && (
+        <optgroup label="適用する">
+          {presets.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+    </select>
   );
 }
 
@@ -379,6 +528,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
             {asset.name}
           </span>
         )}
+        {!locked && <ObjectPresetMenu obj={obj} />}
       </div>
       {locked && <p className="hint">レイヤーがロックされているため編集できません。</p>}
       {!locked && def.params.some((p) => p.kind === 'number' && p.animatable) && (

@@ -51,6 +51,12 @@ export function MenuBar() {
         <button type="button" onClick={() => openDialog({ type: 'projectSettings' })}>
           プロジェクト設定
         </button>
+        <button type="button" onClick={() => openDialog({ type: 'presets' })}>
+          プリセット
+        </button>
+        <button type="button" onClick={() => openDialog({ type: 'shortcuts' })}>
+          ショートカット
+        </button>
         <button
           type="button"
           className="primary"

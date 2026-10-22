@@ -63,8 +63,25 @@ export type EasePreset =
   | 'easeOutBounce'
   | 'easeOutElastic';
 
+/**
+ * 特殊な変化。キーフレームの 2 つの値の間で、
+ * random：一定間隔でランダムな値になる / repeat：往復する / shake：直線で変化しながら細かく揺れる
+ */
+export interface SpecialEase {
+  special: 'random' | 'repeat' | 'shake';
+  /** 値が変わる間隔・往復の周期（フレーム） */
+  period: number;
+  /** 揺れの大きさ（shake のみ） */
+  amount?: number;
+  /** なめらかにつなぐか */
+  smooth?: boolean;
+  /** 乱数の種（同じ値なら同じ動きになる） */
+  seed?: number;
+}
+
 /** キーフレームから次のキーフレームまでの変化の仕方 */
-export type Ease = 'hold' | 'linear' | EasePreset | { bezier: [number, number, number, number] };
+export type Ease =
+  'hold' | 'linear' | EasePreset | { bezier: [number, number, number, number] } | SpecialEase;
 
 export interface Keyframe {
   /** オブジェクトの開始からの相対フレーム */

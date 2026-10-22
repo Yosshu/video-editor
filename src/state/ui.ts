@@ -9,6 +9,8 @@ export type DialogState =
   | { type: 'restore'; savedAt: string; fileName: string | null }
   | { type: 'export' }
   | { type: 'beatGrid' }
+  | { type: 'shortcuts' }
+  | { type: 'presets' }
   | { type: 'about' };
 
 export interface ContextMenuItem {

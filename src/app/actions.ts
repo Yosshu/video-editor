@@ -1,6 +1,14 @@
 import { secondsToFrames } from '../core/model/time';
 import { newId } from '../core/model/ids';
-import type { Asset, ObjectType, ParamValue, TimelineObject } from '../core/model/types';
+import type {
+  Asset,
+  EffectInstance,
+  ObjectType,
+  ParamValue,
+  Rational,
+  TimelineObject,
+} from '../core/model/types';
+import { convertFrameRate, frameConverter } from '../core/project/convert';
 import { createObject } from '../core/project/factory';
 import {
   findFreeStart,
@@ -26,7 +34,12 @@ export function addObject(
   type: ObjectType,
   layer: number,
   frame: number,
-  init: { assetId?: string; params?: Record<string, ParamValue>; length?: number } = {},
+  init: {
+    assetId?: string;
+    params?: Record<string, ParamValue>;
+    effects?: EffectInstance[];
+    length?: number;
+  } = {},
 ): TimelineObject | null {
   const state = getState();
   const scene = currentScene(state);
@@ -41,6 +54,7 @@ export function addObject(
     assetId: init.assetId,
     params: init.params,
   });
+  if (init.effects) obj.effects = init.effects;
   commit('オブジェクトの追加', (draft) => {
     draft.scenes.find((s) => s.id === state.sceneId)?.objects.push(obj);
   });
@@ -288,9 +302,18 @@ export function updateProjectSettings(patch: {
   backgroundColor?: string;
   width?: number;
   height?: number;
+  fps?: Rational;
+  sampleRate?: number;
 }): void {
+  const state = getState();
+  const old = state.project.settings;
+  const fpsChanged =
+    patch.fps !== undefined && (patch.fps.num !== old.fps.num || patch.fps.den !== old.fps.den);
   commit('プロジェクト設定の変更', (draft) => {
-    Object.assign(draft.settings, patch);
+    // フレームレートを変えるときは、すべての時間を換算する
+    if (fpsChanged) convertFrameRate(draft, patch.fps!);
+    const { fps: _fps, ...rest } = patch;
+    Object.assign(draft.settings, rest);
     if (patch.width || patch.height) {
       for (const s of draft.scenes) {
         s.width = draft.settings.width;
@@ -298,4 +321,5 @@ export function updateProjectSettings(patch: {
       }
     }
   });
+  if (fpsChanged) setPlayhead(frameConverter(old.fps, patch.fps!)(state.playhead));
 }

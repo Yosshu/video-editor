@@ -84,3 +84,41 @@ describe('normalizeKeys / splitAnimated', () => {
     }
   });
 });
+
+describe('特殊な変化', () => {
+  const keys = (ease: import('../model/types').Ease) => [
+    { t: 0, v: 0, ease },
+    { t: 100, v: 10 },
+  ];
+
+  it('ランダム：間隔ごとに 2 つの値の間のランダムな値になり、同じ種なら同じ値', () => {
+    const k = keys({ special: 'random', period: 5, seed: 42 });
+    const values = Array.from({ length: 100 }, (_, t) => keysValueAt(k, t));
+    expect(values.every((v) => v >= 0 && v <= 10)).toBe(true);
+    // 5 フレームの間は同じ値
+    expect(values[0]).toBe(values[4]);
+    expect(new Set(values).size).toBeGreaterThan(5);
+    expect(keysValueAt(keys({ special: 'random', period: 5, seed: 42 }), 37)).toBe(values[37]);
+    expect(keysValueAt(keys({ special: 'random', period: 5, seed: 7 }), 37)).not.toBe(values[37]);
+  });
+
+  it('反復：周期ごとに 2 つの値を往復する', () => {
+    const k = keys({ special: 'repeat', period: 20 });
+    expect(keysValueAt(k, 0)).toBeCloseTo(0);
+    expect(keysValueAt(k, 10)).toBeCloseTo(10);
+    expect(keysValueAt(k, 20)).toBeCloseTo(0);
+    expect(keysValueAt(k, 5)).toBeCloseTo(5);
+    const smooth = keys({ special: 'repeat', period: 20, smooth: true });
+    expect(keysValueAt(smooth, 5)).toBeCloseTo(5);
+    expect(keysValueAt(smooth, 2)).toBeLessThan(2);
+  });
+
+  it('振動：直線の変化に揺れ幅以内の揺れが加わる', () => {
+    const k = keys({ special: 'shake', period: 1, amount: 2, seed: 3 });
+    for (let t = 0; t < 100; t++) {
+      expect(Math.abs(keysValueAt(k, t) - t / 10)).toBeLessThanOrEqual(2);
+    }
+    // 最後のキー以降は最後の値
+    expect(keysValueAt(k, 150)).toBe(10);
+  });
+});

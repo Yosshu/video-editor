@@ -4,8 +4,10 @@ import { BeatGridDialog } from './dialogs/BeatGridDialog';
 import { ExportDialog } from './dialogs/ExportDialog';
 import { MissingAssetsDialog } from './dialogs/MissingAssetsDialog';
 import { NewProjectDialog } from './dialogs/NewProjectDialog';
+import { PresetsDialog } from './dialogs/PresetsDialog';
 import { ProjectSettingsDialog } from './dialogs/ProjectSettingsDialog';
 import { RestoreDialog } from './dialogs/RestoreDialog';
+import { ShortcutsDialog } from './dialogs/ShortcutsDialog';
 
 export function DialogHost() {
   const dialog = useUi((s) => s.dialog);
@@ -25,5 +27,9 @@ export function DialogHost() {
       return <AboutDialog />;
     case 'beatGrid':
       return <BeatGridDialog />;
+    case 'shortcuts':
+      return <ShortcutsDialog />;
+    case 'presets':
+      return <PresetsDialog />;
   }
 }

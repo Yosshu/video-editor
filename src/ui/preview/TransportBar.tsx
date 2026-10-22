@@ -4,6 +4,7 @@ import { sceneDuration } from '../../core/timeline/ops';
 import { playback } from '../../engine/playback/Playback';
 import { currentScene, useEditor, type PreviewQuality } from '../../state/store';
 import { useUi } from '../../state/ui';
+import { togglePreviewFullscreen } from './fullscreen';
 import { LevelMeter } from './LevelMeter';
 
 interface Props {
@@ -108,6 +109,15 @@ export function TransportBar({ quality, onQuality }: Props) {
           <option value={0.25}>1/4</option>
         </select>
       </label>
+      <button
+        type="button"
+        className="icon-button"
+        onClick={() => void togglePreviewFullscreen()}
+        aria-label="全画面表示"
+        title="全画面表示の切り替え（F）"
+      >
+        ⛶
+      </button>
     </div>
   );
 }
