@@ -1,7 +1,9 @@
+import { promptInstall, usePwa } from '../../../app/pwa';
 import { closeDialog, openDialog } from '../../../state/ui';
 import { Dialog } from '../../common/Dialog';
 
 export function AboutDialog() {
+  const canInstall = usePwa((s) => s.canInstall);
   return (
     <Dialog
       title="使い方"
@@ -29,6 +31,16 @@ export function AboutDialog() {
           キーボードショートカットの一覧と変更…
         </button>
       </p>
+      <p className="hint">
+        アプリとしてインストールすると、ネットにつながっていなくても使え、編集ファイル（.vedproj・.vedpack）をダブルクリックで開けるようになります（対応ブラウザのみ）。
+      </p>
+      {canInstall && (
+        <p>
+          <button type="button" className="primary" onClick={() => void promptInstall()}>
+            アプリとしてインストール
+          </button>
+        </p>
+      )}
     </Dialog>
   );
 }

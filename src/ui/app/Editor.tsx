@@ -12,6 +12,7 @@ import { ContextMenu } from './ContextMenu';
 import { DialogHost } from './DialogHost';
 import { MenuBar } from './MenuBar';
 import { BusyOverlay } from './BusyOverlay';
+import { UpdateBanner } from './UpdateBanner';
 import { Notices } from './Notices';
 import { handleShortcut } from './shortcuts';
 import { Splitter } from './Splitter';
@@ -28,7 +29,21 @@ export function Editor() {
     setupPreviewAudio();
     window.addEventListener('keydown', handleShortcut);
     const stopAutosave = startAutosave();
-    void checkAutosave();
+    // インストールしたアプリで編集ファイルを開いたとき（ダブルクリックなど）
+    let launched = false;
+    window.launchQueue?.setConsumer(async ({ files }) => {
+      for (const handle of files) {
+        const file = await handle.getFile();
+        if (!isProjectFileName(file.name)) continue;
+        launched = true;
+        await openProjectFile(file, handle);
+        return;
+      }
+    });
+    // ファイルを開いて起動したときは、自動保存からの復元を尋ねない
+    setTimeout(() => {
+      if (!launched) void checkAutosave();
+    }, 0);
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (getState().dirty) e.preventDefault();
     };
@@ -94,6 +109,7 @@ export function Editor() {
       <DialogHost />
       <Notices />
       <BusyOverlay />
+      <UpdateBanner />
     </div>
   );
 }

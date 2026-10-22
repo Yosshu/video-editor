@@ -32,7 +32,17 @@ interface DataTransferItem {
   getAsFileSystemHandle?(): Promise<FileSystemHandle | null>;
 }
 
+/** インストールしたアプリでファイルを開いたときに渡される（File Handling API） */
+interface LaunchParams {
+  files: FileSystemFileHandle[];
+}
+
+interface LaunchQueue {
+  setConsumer(consumer: (params: LaunchParams) => void): void;
+}
+
 interface Window {
+  launchQueue?: LaunchQueue;
   showSaveFilePicker?(options?: SaveFilePickerOptions): Promise<FileSystemFileHandle>;
   showOpenFilePicker?(options?: OpenFilePickerOptions): Promise<FileSystemFileHandle[]>;
   queryLocalFonts?(): Promise<
