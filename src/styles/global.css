@@ -598,6 +598,7 @@ textarea {
 }
 
 .tl-ruler {
+  user-select: none;
   position: sticky;
   top: 0;
   z-index: 5;
@@ -1290,4 +1291,66 @@ kbd {
 
 .level-clip.on {
   background: var(--danger);
+}
+
+/* マーカー */
+.tl-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  cursor: ew-resize;
+  user-select: none;
+  transform: translateX(-5px);
+}
+
+.tl-marker-flag {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 9px solid currentColor;
+}
+
+.tl-marker-label {
+  margin-left: 2px;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  color: currentColor;
+  font-size: 10px;
+  line-height: 13px;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-marker-line {
+  position: absolute;
+  top: 0;
+  width: 0;
+  border-left: 1px dashed;
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* BPM グリッド */
+.tl-beat {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+.tl-beat.bar {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.toolbar-item.active {
+  color: var(--accent);
 }

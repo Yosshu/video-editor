@@ -46,9 +46,12 @@ import { isProjectFileName, MEDIA_ACCEPT } from '../../engine/media/detect';
 import { pickFilesWithInput } from '../../storage/filePicker';
 import { playback } from '../../engine/playback/Playback';
 import { currentScene, getState, setPlayhead, setSelection, useEditor } from '../../state/store';
-import { openContextMenu, useUi } from '../../state/ui';
+import { openContextMenu, openDialog, useUi } from '../../state/ui';
 import { usePeaks, useThumbnail } from '../common/mediaHooks';
 import { ASSET_DRAG_TYPE } from '../media-bin/MediaBin';
+import { addMarker, addMarkerAtPlayhead } from '../../app/markerActions';
+import { markerSnapPoints } from '../../core/timeline/markers';
+import { BeatGridLines, MarkerLines, RulerMarkers } from './Markers';
 import { SceneTabs } from './SceneTabs';
 import { Waveform } from './Waveform';
 import {
@@ -185,6 +188,7 @@ function Ruler({
   contentWidth: number;
 }) {
   const fps = useEditor((s) => s.project.settings.fps);
+  const markers = useEditor((s) => currentScene(s).markers);
   const { major, minor } = chooseTickInterval(ppf, fps);
   const from = Math.max(0, Math.floor((viewport.scrollLeft - 100) / ppf / minor) * minor);
   const to = (viewport.scrollLeft + viewport.width + 100) / ppf;
@@ -220,9 +224,21 @@ function Ruler({
       className="tl-ruler"
       style={{ width: contentWidth }}
       onPointerDown={onPointerDown}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        const frame = Math.max(
+          0,
+          Math.round((e.clientX - e.currentTarget.getBoundingClientRect().left) / ppf),
+        );
+        openContextMenu(e.clientX, e.clientY, [
+          { label: 'ここにマーカーを追加', action: () => addMarker(frame) },
+          { label: 'BPM グリッドの設定…', action: () => openDialog({ type: 'beatGrid' }) },
+        ]);
+      }}
       data-testid="timeline-ruler"
     >
       {ticks}
+      {markers && <RulerMarkers markers={markers} ppf={ppf} fps={fps} />}
     </div>
   );
 }
@@ -490,7 +506,10 @@ export function Timeline() {
         ? ids.filter((id) => !lockedLayers.has(sc.objects.find((o) => o.id === id)?.layer ?? 0))
         : [obj.id];
     const moving = sc.objects.filter((o) => movingIds.includes(o.id));
-    const snapPoints = collectSnapPoints(sc, new Set(movingIds), state.playhead);
+    const snapPoints = [
+      ...collectSnapPoints(sc, new Set(movingIds), state.playhead),
+      ...markerSnapPoints(sc, fps, 0, contentFrames),
+    ];
     let dragged = false;
     let last: { df: number; dl: number; edge: number } = { df: 0, dl: 0, edge: 0 };
 
@@ -813,6 +832,22 @@ export function Timeline() {
           />
           吸着
         </label>
+        <button
+          type="button"
+          className="toolbar-item"
+          onClick={addMarkerAtPlayhead}
+          title="再生位置にマーカーを追加（M）"
+        >
+          ＋マーカー
+        </button>
+        <button
+          type="button"
+          className={`toolbar-item ${scene.beatGrid?.visible ? 'active' : ''}`}
+          onClick={() => openDialog({ type: 'beatGrid' })}
+          title="曲のテンポに合わせた目盛り"
+        >
+          BPM{scene.beatGrid ? ` ${Math.round(scene.beatGrid.bpm * 100) / 100}` : ''}
+        </button>
         <span className="toolbar-hint">
           右クリックでオブジェクトを追加 ・ 素材をドロップして配置
         </span>
@@ -841,6 +876,16 @@ export function Timeline() {
             onDrop={onDrop}
             data-testid="timeline-tracks"
           >
+            {scene.beatGrid?.visible && (
+              <BeatGridLines
+                grid={scene.beatGrid}
+                fps={fps}
+                ppf={ppf}
+                from={visibleFrom}
+                to={visibleTo}
+                height={tracksHeight}
+              />
+            )}
             {[...hiddenLayers]
               .filter((l) => rowIndex.has(l))
               .map((l) => (
@@ -884,6 +929,9 @@ export function Timeline() {
                   height: Math.abs(band.y1 - band.y0),
                 }}
               />
+            )}
+            {scene.markers && (
+              <MarkerLines markers={scene.markers} ppf={ppf} height={tracksHeight} />
             )}
             <PlayheadLine ppf={ppf} height={tracksHeight} />
           </div>

@@ -1,5 +1,6 @@
 import { useUi } from '../../state/ui';
 import { AboutDialog } from './dialogs/AboutDialog';
+import { BeatGridDialog } from './dialogs/BeatGridDialog';
 import { ExportDialog } from './dialogs/ExportDialog';
 import { MissingAssetsDialog } from './dialogs/MissingAssetsDialog';
 import { NewProjectDialog } from './dialogs/NewProjectDialog';
@@ -22,5 +23,7 @@ export function DialogHost() {
       return <ExportDialog />;
     case 'about':
       return <AboutDialog />;
+    case 'beatGrid':
+      return <BeatGridDialog />;
   }
 }

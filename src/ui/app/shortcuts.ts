@@ -11,6 +11,7 @@ import {
   stepFrames,
 } from '../../app/actions';
 import { pickAndOpenProject, saveProject } from '../../app/projectFile';
+import { addMarkerAtPlayhead, jumpToMarker } from '../../app/markerActions';
 import { rippleDeleteSelection } from '../../app/timelineActions';
 import { fpsValue } from '../../core/model/time';
 import { playback } from '../../engine/playback/Playback';
@@ -22,6 +23,8 @@ export const SHORTCUTS: { keys: string; label: string }[] = [
   { keys: '← / →', label: '1 フレーム戻る / 進む（Shift で 1 秒）' },
   { keys: 'Home / End', label: '先頭 / 末尾へ移動' },
   { keys: 'S', label: '再生位置で分割' },
+  { keys: 'M', label: '再生位置にマーカーを追加' },
+  { keys: 'Ctrl + ← / →', label: '前 / 次のマーカーへ移動' },
   { keys: 'Delete', label: '選択したオブジェクトを削除' },
   { keys: 'Shift + Delete', label: '削除して後ろを詰める（リップル削除）' },
   { keys: 'Ctrl + Z / Ctrl + Y', label: '元に戻す / やり直し' },
@@ -94,6 +97,14 @@ export function handleShortcut(e: KeyboardEvent): void {
         case 'KeyA':
           selectAll();
           return true;
+        case 'ArrowLeft':
+          playback.pause();
+          jumpToMarker(-1);
+          return true;
+        case 'ArrowRight':
+          playback.pause();
+          jumpToMarker(1);
+          return true;
       }
       return false;
     }
@@ -119,6 +130,9 @@ export function handleShortcut(e: KeyboardEvent): void {
         return true;
       case 'KeyS':
         splitAtPlayhead();
+        return true;
+      case 'KeyM':
+        addMarkerAtPlayhead();
         return true;
       case 'Delete':
       case 'Backspace':

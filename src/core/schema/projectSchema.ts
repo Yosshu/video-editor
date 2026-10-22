@@ -76,6 +76,24 @@ const layerSchema = z
   })
   .loose();
 
+const markerSchema = z
+  .object({
+    id: z.string().max(128),
+    frame: z.number().int().min(0),
+    label: z.string().max(1_000).optional(),
+    color: z.string().max(32).optional(),
+  })
+  .loose();
+
+const beatGridSchema = z
+  .object({
+    bpm: z.number().min(1).max(1_000),
+    offset: z.number().int(),
+    beatsPerBar: z.number().int().min(1).max(64),
+    visible: z.boolean(),
+  })
+  .loose();
+
 const sceneSchema = z
   .object({
     id: z.string().max(128),
@@ -84,6 +102,8 @@ const sceneSchema = z
     height: z.number().int().min(1).max(16_384),
     layers: z.array(layerSchema).max(10_000),
     objects: z.array(objectSchema).max(100_000),
+    markers: z.array(markerSchema).max(10_000).optional(),
+    beatGrid: beatGridSchema.optional(),
   })
   .loose();
 

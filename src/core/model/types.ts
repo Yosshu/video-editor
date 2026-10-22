@@ -132,6 +132,28 @@ export interface LayerState {
   collapsed?: boolean;
 }
 
+/** タイムライン上の目印 */
+export interface Marker {
+  id: string;
+  /** フレーム */
+  frame: number;
+  label?: string;
+  /** 表示色（#rrggbb） */
+  color?: string;
+}
+
+/** 曲のテンポに合わせた目盛り（BPM グリッド） */
+export interface BeatGrid {
+  /** 1 分あたりの拍数 */
+  bpm: number;
+  /** 1 拍目のフレーム */
+  offset: number;
+  /** 1 小節の拍数 */
+  beatsPerBar: number;
+  /** タイムラインに表示するか（表示中は拍に吸着する） */
+  visible: boolean;
+}
+
 export interface Scene {
   id: string;
   name: string;
@@ -140,6 +162,8 @@ export interface Scene {
   /** 既定値から変更のあるレイヤーだけを持つ */
   layers: LayerState[];
   objects: TimelineObject[];
+  markers?: Marker[];
+  beatGrid?: BeatGrid;
 }
 
 export interface Project {

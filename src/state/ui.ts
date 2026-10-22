@@ -8,6 +8,7 @@ export type DialogState =
   | { type: 'missingAssets' }
   | { type: 'restore'; savedAt: string; fileName: string | null }
   | { type: 'export' }
+  | { type: 'beatGrid' }
   | { type: 'about' };
 
 export interface ContextMenuItem {
