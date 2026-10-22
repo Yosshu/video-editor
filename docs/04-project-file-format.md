@@ -17,7 +17,7 @@
 
 - 拡張子は独自に決められる。`ved` は "video editor" の略。アプリ名が決まったらそれに合わせて変更してよい（形式が確定する Phase 1 までに決める）。
 - 既存の有名ソフトと重複しない名前を選ぶ。
-- PWA 化（Phase 8）すると、インストールしたアプリに拡張子を関連付けて、ダブルクリックで開けるようにできる（Chromium 系の File Handling API）。
+- PWA としてインストールすると、拡張子が関連付けられ、ダブルクリックで開ける（Chromium 系の File Handling API）。
 
 ## 3. 続きから編集する3つの方法
 
@@ -74,13 +74,13 @@
 ```jsonc
 {
   "id": "as_7f3a",
-  "kind": "video", // video | image | audio | font
+  "kind": "video", // video | image | audio | font | lut
   "name": "opening.mp4", // 元のファイル名
   "mimeType": "video/mp4",
   "size": 52428800, // バイト数
   "lastModified": 1760000000000,
   "fingerprint": "ht1:9f2c…", // 先頭・末尾の SHA-256（3.1）
-  "durationSec": 12.5,
+  "durationSec": 12.5, // 動画・音声の長さ。アニメーション画像なら 1 回分の長さ
   "video": { "width": 1920, "height": 1080, "codec": "avc1.640028", "frameRate": 29.97 },
   "audio": { "sampleRate": 48000, "channels": 2, "codec": "mp4a.40.2" },
 }
@@ -156,10 +156,11 @@
 ```
 
 - `type` の種類
-  - メディア：`video` `image` `audio` `text` `shape` `solid`、`scene`（別のシーンを素材にする。`params.sceneRef` にシーン ID）、`framebuffer`（それまでに描いた画面を素材にする）、`audioWave`（`params.targetLayer` のレイヤーにある音声・動画の音の大きさを表示する）
+  - メディア：`video` `image` `audio` `text` `shape` `solid` `particles`（パーティクル）、`scene`（別のシーンを素材にする。`params.sceneRef` にシーン ID）、`framebuffer`（それまでに描いた画面を素材にする）、`audioWave`（`params.targetLayer` のレイヤーにある音声・動画の音の大きさを表示する）
   - 制御：`filter`（上のレイヤー全体にエフェクト）、`partialFilter`（範囲の中だけエフェクト）、`group`（グループ制御）、`timeControl`（時間制御）、`camera`（カメラ制御）。制御オブジェクトの `range` は作用する下のレイヤー数（0 で下のすべて）
 - `effects` はオブジェクトに上から順に適用するエフェクト。エフェクトのパラメータもキーフレームで変化させられる（形式はオブジェクトのパラメータと同じ）。知らない種類のエフェクトは描画せずにそのまま残す。`type` の種類：
   - 映像：`colorAdjust`（色調補正）`monochrome`（単色化）`blur`（ぼかし）`edgeBlur`（境界ぼかし）`mosaic`（モザイク）`sharpen`（シャープ）`glow`（発光）`outline`（縁取り）`dropShadow`（ドロップシャドウ）`crop`（クリッピング）`mask`（図形マスク）`chromaKey` `colorKey` `lumaKey`（キー抜き）、`mirror`（ミラー）`vibrate`（振動）`wave`（波打ち）`polar`（極座標変換）`displace`（ゆがみ：膨らみ・へこみ・渦巻き）`tile`（画像ループ）`light`（ライト）`directionalBlur`（方向ブラー）`radialBlur`（放射ブラー）`noise`（ノイズ）`chromaticShift`（色ずれ）`diagonalClip`（斜めクリッピング）
+  - 映像（Phase 8）：`lut`（LUT による色の変換。`params.lut` に LUT 素材の ID）、`customShader`（ユーザー定義シェーダー。`params.code` に GLSL、`param1`〜`param4`）
   - 音声：`equalizer`（イコライザー）`compressor`（コンプレッサー）`delay`（ディレイ・エコー）`reverb`（リバーブ）。音声・動画・シーンオブジェクトにかけられる
 - パラメータはオブジェクトの種類ごとに定義されている（`src/core/objects/definitions.ts`）。省略したパラメータは既定値とみなす（ファイルを小さく保ち、既定値の変更にも追従しやすくする）。
 - 主なパラメータ
@@ -167,9 +168,11 @@
   - 3D：`z`（奥行き、px）、`rotX` `rotY`（度）
   - 登場・退場：`enterType` `exitType`（`fade` `slideLeft` `zoom` `wipeLeft` `circle` など）、`enterDuration` `exitDuration`（秒）
   - フェード：`fadeIn` `fadeOut`（秒）
-  - 動画・音声：`offset`（素材の再生開始位置、秒）、`speed`（%）、`loop`、`volume`（%）、`pan`（-100〜100）
+  - 動画・音声：`offset`（素材の再生開始位置、秒）、`speed`（%）、`loop`、`keepPitch`（速度を変えても音程を保つ）、`volume`（%）、`pan`（-100〜100）
+  - 画像：アニメーション画像のとき `speed`（%）、`loop` を使う
   - テキスト：`text` `font` `size` `color` `bold` `italic` `align` `lineHeight` `letterSpacing` `outlineWidth` `outlineColor` `shadow` `typeSpeed`（1 文字ずつ表示）など
   - 図形：`shape` `width` `height` `color` `strokeWidth` `cornerRadius` `starInner`
+  - パーティクル：`rate`（個/秒）`life`（秒）`prewarm` `direction`（度、0 が上）`spread` `speed`（px/秒）`speedRandom` `gravity` `emitterWidth` `emitterHeight` `seed` `shape`（`circle` `glow` `square` `star`）`particleSize` `sizeRandom` `sizeEnd` `color` `color2` `fadeAway` `spin`
 - シーンの長さは、最後のオブジェクトの終了位置で決まる（保存しない）。
 
 ### 4.4 パラメータとキーフレームの表し方
@@ -187,6 +190,7 @@
       - `repeat`：`period` フレームを 1 周期として、2 つの値を往復する
       - `shake`：2 つの値を直線で変化しながら、`period` フレームごとに ±`amount` の範囲で揺れる
       - `smooth` で間をなめらかにつなぐ。`seed` は乱数の種（同じ値なら同じ動き。開き直しても変わらない）
+- 式で求める値：`{ "expr": "sin(time * 2) * 100" }` で表す（Phase 8）。数値のパラメータに使え、時刻（`time` 秒・`frame`・`length`・`fps`）、同じオブジェクトの他のパラメータ（`x` など）、関数 `layer(2, "x")`（レイヤー 2 にあるオブジェクトの値）を使える。式の書き方と安全性は [03-architecture.md](03-architecture.md) の 16 章。誤りのある式は既定値として扱う。
 - オブジェクト全体を区切る「中間点」は、すべてのパラメータの同じ時刻にキーを打つ操作として UI で提供する（データ上はパラメータごとのキーに統一）。
 
 ### 4.5 時間の表し方
@@ -211,18 +215,18 @@
 example.vedpack（ZIP）
 ├── mimetype            # "application/x-vedpack"（無圧縮・先頭に配置）
 ├── project.vedproj     # 編集ファイル（4 と同じ形式）
-├── media/
-│   ├── as_7f3a.mp4     # 素材（動画は圧縮済みなので無圧縮で格納）
-│   └── as_91bc.png
-└── fonts/
-    └── as_0c11.ttf
+└── media/
+    ├── as_7f3a.mp4     # 素材（素材 ID ＋元の拡張子。無圧縮で格納）
+    ├── as_91bc.png
+    └── as_0c11.cube
 ```
 
-- ZIP は書き出し中もメモリに全体を載せないストリーム方式で作る（Chromium 系では直接ファイルへ書き込む）。
-- 読み込み時は、素材を OPFS に展開してから使う。
+- ZIP はすべて無圧縮（stored）で、4 GiB を超える素材は ZIP64 で書く。書き出し中もメモリに全体を載せないストリーム方式で作る（Chromium 系では直接ファイルへ書き込む）。
+- 読み込み時は、ZIP の中の素材の範囲をそのまま `Blob` として使う（展開しない）。Chromium 系では、パッケージのファイルハンドルと素材の範囲をブラウザに覚えておき、次回もパッケージから直接読む。
+- パッケージを開いて保存すると、通常の編集ファイル（`.vedproj`）になる。
 
 ## 7. 安全性
 
 - 編集ファイル・パッケージは信頼できない入力として扱い、必ずスキーマ検証してから使う。
-- 編集ファイル内の文字列をプログラムとして実行しない。将来、式やユーザー定義シェーダーを入れる場合は、実行範囲を限定した仕組みで評価する。
+- 編集ファイル内の文字列をプログラムとして実行しない。式は自前の小さな言語として評価し、ユーザー定義シェーダーは実行してよいか利用者に確かめてから GPU で動かす（[03-architecture.md](03-architecture.md) の 16 章）。
 - ファイルサイズ・オブジェクト数・ネストの深さに上限を設け、異常なファイルでブラウザが固まらないようにする。
