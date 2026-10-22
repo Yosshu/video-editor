@@ -1,6 +1,6 @@
 import { EASE_PRESETS } from '../animation/ease';
 import { valueAt } from '../animation/interpolate';
-import { getEffectDef } from '../effects/definitions';
+import { effectDomain, getEffectDef, type EffectDomain } from '../effects/definitions';
 import { framesToSeconds } from '../model/time';
 import type { EffectInstance, Rational, Scene, TimelineObject } from '../model/types';
 import { getObjectDef, type ObjectTypeDef, type TransitionType } from '../objects/definitions';
@@ -25,12 +25,19 @@ export interface ResolvedEffect {
   params: ResolvedParams;
 }
 
-/** 有効で、種類を知っているエフェクトだけを評価する（新しいバージョンのエフェクトは無視して残す） */
-export function resolveEffects(effects: EffectInstance[], t: number): ResolvedEffect[] {
+/**
+ * 有効で、種類を知っているエフェクトだけを評価する（新しいバージョンのエフェクトは無視して残す）。
+ * domain で映像・音声のどちらのエフェクトを評価するかを選ぶ
+ */
+export function resolveEffects(
+  effects: EffectInstance[],
+  t: number,
+  domain: EffectDomain = 'video',
+): ResolvedEffect[] {
   const out: ResolvedEffect[] = [];
   for (const e of effects) {
     const def = getEffectDef(e.type);
-    if (!e.enabled || !def) continue;
+    if (!e.enabled || !def || effectDomain(def) !== domain) continue;
     const params: ResolvedParams = {};
     for (const p of def.params) params[p.id] = valueAt(e.params[p.id], t, p.default as never);
     out.push({ id: e.id, type: e.type, params });

@@ -1,12 +1,34 @@
 import type { ParamDef } from '../params/defs';
 
-/** エフェクトの定義（パラメータと表示名）。描画の実装は src/engine/effects にある */
+/**
+ * エフェクトの定義（パラメータと表示名）。
+ * 映像の実装は src/engine/effects、音声の実装は src/engine/audio/effects.ts にある
+ */
 export interface EffectDef {
   type: string;
   label: string;
   category: string;
+  /** 映像にかけるか音声にかけるか（省略時は映像） */
+  domain?: EffectDomain;
   params: ParamDef[];
 }
+
+export type EffectDomain = 'video' | 'audio';
+
+/** 数値パラメータ（キーフレームで変化させられる） */
+const numberParam = (
+  id: string,
+  label: string,
+  def: number,
+  opts: {
+    min?: number;
+    max?: number;
+    sliderMin?: number;
+    sliderMax?: number;
+    step?: number;
+    unit?: string;
+  },
+): ParamDef => ({ id, label, kind: 'number', default: def, animatable: true, step: 1, ...opts });
 
 const color = (id: string, label: string, def: string): ParamDef => ({
   id,
@@ -15,7 +37,8 @@ const color = (id: string, label: string, def: string): ParamDef => ({
   default: def,
 });
 
-export const EFFECTS: EffectDef[] = [
+/** 映像エフェクト */
+const VIDEO_EFFECTS: EffectDef[] = [
   {
     type: 'colorAdjust',
     label: '色調補正',
@@ -555,12 +578,100 @@ export const EFFECTS: EffectDef[] = [
   },
 ];
 
+/** 音声エフェクト */
+const AUDIO_EFFECTS: EffectDef[] = [
+  {
+    type: 'equalizer',
+    label: 'イコライザー',
+    category: '音声',
+    domain: 'audio',
+    params: [
+      numberParam('lowGain', '低音', 0, { min: -24, max: 24, step: 0.1, unit: 'dB' }),
+      numberParam('lowFreq', '低音の周波数', 120, { min: 20, max: 1000, step: 1, unit: 'Hz' }),
+      numberParam('midGain', '中音', 0, { min: -24, max: 24, step: 0.1, unit: 'dB' }),
+      numberParam('midFreq', '中音の周波数', 1000, {
+        min: 100,
+        max: 10000,
+        sliderMax: 5000,
+        step: 1,
+        unit: 'Hz',
+      }),
+      numberParam('midQ', '中音の幅（Q）', 1, { min: 0.1, max: 10, step: 0.01 }),
+      numberParam('highGain', '高音', 0, { min: -24, max: 24, step: 0.1, unit: 'dB' }),
+      numberParam('highFreq', '高音の周波数', 8000, {
+        min: 1000,
+        max: 20000,
+        step: 1,
+        unit: 'Hz',
+      }),
+      numberParam('lowCut', 'ローカット（0 で無効）', 0, {
+        min: 0,
+        max: 1000,
+        sliderMax: 500,
+        unit: 'Hz',
+      }),
+      numberParam('highCut', 'ハイカット（0 で無効）', 0, { min: 0, max: 20000, unit: 'Hz' }),
+    ],
+  },
+  {
+    type: 'compressor',
+    label: 'コンプレッサー',
+    category: '音声',
+    domain: 'audio',
+    params: [
+      numberParam('threshold', 'しきい値', -18, { min: -60, max: 0, step: 0.1, unit: 'dB' }),
+      numberParam('ratio', '圧縮比', 4, { min: 1, max: 20, step: 0.1, unit: ': 1' }),
+      numberParam('attack', 'アタック', 10, {
+        min: 0.1,
+        max: 200,
+        sliderMax: 100,
+        step: 0.1,
+        unit: 'ms',
+      }),
+      numberParam('release', 'リリース', 150, { min: 10, max: 2000, sliderMax: 1000, unit: 'ms' }),
+      numberParam('knee', 'ニー', 6, { min: 0, max: 24, step: 0.1, unit: 'dB' }),
+      numberParam('makeup', '音量の補正', 0, { min: 0, max: 24, step: 0.1, unit: 'dB' }),
+    ],
+  },
+  {
+    type: 'delay',
+    label: 'ディレイ・エコー',
+    category: '音声',
+    domain: 'audio',
+    params: [
+      numberParam('time', '遅れ', 300, { min: 1, max: 2000, sliderMax: 1000, unit: 'ms' }),
+      numberParam('feedback', '繰り返し', 35, { min: 0, max: 95, step: 0.1, unit: '%' }),
+      numberParam('mix', 'エコーの大きさ', 35, { min: 0, max: 100, step: 0.1, unit: '%' }),
+      { id: 'pingPong', label: '左右に跳ね返す', kind: 'boolean', default: false },
+    ],
+  },
+  {
+    type: 'reverb',
+    label: 'リバーブ',
+    category: '音声',
+    domain: 'audio',
+    params: [
+      numberParam('roomSize', '部屋の大きさ', 60, { min: 0, max: 100, step: 0.1, unit: '%' }),
+      numberParam('damping', '高音の吸収', 50, { min: 0, max: 100, step: 0.1, unit: '%' }),
+      numberParam('mix', '残響の大きさ', 25, { min: 0, max: 100, step: 0.1, unit: '%' }),
+      numberParam('preDelay', '残響の遅れ', 10, { min: 0, max: 200, unit: 'ms' }),
+      numberParam('width', '広がり', 100, { min: 0, max: 100, step: 0.1, unit: '%' }),
+    ],
+  },
+];
+
+export const EFFECTS: EffectDef[] = [...VIDEO_EFFECTS, ...AUDIO_EFFECTS];
+
 export const EFFECT_MAP: Record<string, EffectDef> = Object.fromEntries(
   EFFECTS.map((e) => [e.type, e]),
 );
 
 export function getEffectDef(type: string): EffectDef | undefined {
   return EFFECT_MAP[type];
+}
+
+export function effectDomain(def: EffectDef): EffectDomain {
+  return def.domain ?? 'video';
 }
 
 export const EFFECT_CATEGORIES = [...new Set(EFFECTS.map((e) => e.category))];

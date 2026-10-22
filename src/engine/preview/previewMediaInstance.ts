@@ -45,3 +45,8 @@ export function getPreviewMedia(): MediaProvider {
 export function setupPreviewAudio(): void {
   init();
 }
+
+/** 再生中の音量（レベルメーター用）。再生していなければ null */
+export function getPreviewAudioLevels(): ReturnType<AudioPlayer['levels']> {
+  return instance?.audio.levels() ?? null;
+}

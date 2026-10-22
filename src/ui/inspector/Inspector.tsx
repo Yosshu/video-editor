@@ -13,7 +13,12 @@ import { referableScenes } from '../../app/sceneActions';
 import { EASE_OPTIONS } from '../../core/animation/ease';
 import { isAnimated, valueAt } from '../../core/animation/interpolate';
 import { easeAt, hasKeyAt, objectKeyTimes } from '../../core/animation/keys';
-import { EFFECT_CATEGORIES, EFFECTS, getEffectDef } from '../../core/effects/definitions';
+import {
+  EFFECT_CATEGORIES,
+  EFFECTS,
+  effectDomain,
+  getEffectDef,
+} from '../../core/effects/definitions';
 import { resolveParams } from '../../core/evaluate/evaluate';
 import { formatTimecode, fpsValue } from '../../core/model/time';
 import type { Ease, EffectInstance, ParamMap, TimelineObject } from '../../core/model/types';
@@ -299,6 +304,9 @@ function EffectsSection({
   local: number;
   disabled: boolean;
 }) {
+  const def = getObjectDef(obj.type);
+  // 映像を持つなら映像エフェクト、音声を持つなら音声エフェクトを選べる
+  const available = EFFECTS.filter((d) => (effectDomain(d) === 'audio' ? def.audio : def.visual));
   return (
     <details open className="param-group effects-section">
       <summary>エフェクト{obj.effects.length > 0 ? `（${obj.effects.length}）` : ''}</summary>
@@ -323,13 +331,15 @@ function EffectsSection({
           }}
         >
           <option value="">＋ エフェクトを追加…</option>
-          {EFFECT_CATEGORIES.map((c) => (
+          {EFFECT_CATEGORIES.filter((c) => available.some((d) => d.category === c)).map((c) => (
             <optgroup key={c} label={c}>
-              {EFFECTS.filter((d) => d.category === c).map((d) => (
-                <option key={d.type} value={d.type}>
-                  {d.label}
-                </option>
-              ))}
+              {available
+                .filter((d) => d.category === c)
+                .map((d) => (
+                  <option key={d.type} value={d.type}>
+                    {d.label}
+                  </option>
+                ))}
             </optgroup>
           ))}
         </select>

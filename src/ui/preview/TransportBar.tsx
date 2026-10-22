@@ -4,6 +4,7 @@ import { sceneDuration } from '../../core/timeline/ops';
 import { playback } from '../../engine/playback/Playback';
 import { currentScene, useEditor, type PreviewQuality } from '../../state/store';
 import { useUi } from '../../state/ui';
+import { LevelMeter } from './LevelMeter';
 
 interface Props {
   quality: PreviewQuality;
@@ -73,6 +74,7 @@ export function TransportBar({ quality, onQuality }: Props) {
       <span className="timecode" data-testid="timecode">
         {timecode} / {total}
       </span>
+      <LevelMeter />
       <span className="guide-toggles">
         <label title="三分割線と中心を表示">
           <input

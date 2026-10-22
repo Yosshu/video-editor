@@ -399,6 +399,7 @@ export const OBJECT_TYPES: Record<ObjectType, ObjectTypeDef> = {
   },
   audio: {
     type: 'audio',
+    effects: true,
     label: '音声',
     color: '#3c9467',
     visual: false,

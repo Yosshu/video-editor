@@ -18,6 +18,8 @@ export class AudioPlayer implements PlaybackAudio {
   private session = 0;
   private scheduled = new Set<AudioBufferSourceNode>();
   private gain: GainNode | null = null;
+  private analysers: [AnalyserNode, AnalyserNode] | null = null;
+  private levelBuf = new Float32Array(2048);
 
   constructor(private sources: MixSources & { prune?: () => void }) {}
 
@@ -28,6 +30,16 @@ export class AudioPlayer implements PlaybackAudio {
       this.ctx = new AudioContext({ sampleRate, latencyHint: 'interactive' });
       this.gain = this.ctx.createGain();
       this.gain.connect(this.ctx.destination);
+      // レベルメーター用に左右を分けて調べる
+      const splitter = this.ctx.createChannelSplitter(2);
+      this.gain.connect(splitter);
+      const make = (ch: number) => {
+        const a = this.ctx!.createAnalyser();
+        a.fftSize = 2048;
+        splitter.connect(a, ch);
+        return a;
+      };
+      this.analysers = [make(0), make(1)];
     }
     return this.ctx;
   }
@@ -93,6 +105,27 @@ export class AudioPlayer implements PlaybackAudio {
       index++;
       if (index % 8 === 0) this.sources.prune?.();
     }
+  }
+
+  /** 出力の音量（直近の約 40ms のピークと実効値、左右。0〜1 以上） */
+  levels(): { peak: [number, number]; rms: [number, number] } | null {
+    if (!this.analysers || this.ctx?.state !== 'running') return null;
+    const peak: [number, number] = [0, 0];
+    const rms: [number, number] = [0, 0];
+    this.analysers.forEach((a, ch) => {
+      const buf = this.levelBuf;
+      a.getFloatTimeDomainData(buf);
+      let p = 0;
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = Math.abs(buf[i]);
+        if (v > p) p = v;
+        sum += buf[i] * buf[i];
+      }
+      peak[ch] = p;
+      rms[ch] = Math.sqrt(sum / buf.length);
+    });
+    return { peak, rms };
   }
 
   stop(): void {

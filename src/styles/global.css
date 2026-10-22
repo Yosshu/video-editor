@@ -1201,3 +1201,64 @@ kbd {
 .scene-tab.add {
   padding: 2px 8px;
 }
+
+/* レベルメーター */
+.level-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 130px;
+  cursor: pointer;
+}
+
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 7px;
+}
+
+.level-label {
+  width: 8px;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.level-track {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  background: var(--bg-input);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.level-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  /* 位置で色が変わるよう、トラック全体の幅のグラデーションを切り取って見せる */
+  background: linear-gradient(90deg, #3cb371 0 70%, #e0c341 70% 90%, #ff5c5c 90% 100%);
+  background-size: 130px 100%;
+}
+
+.level-peak {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--text);
+}
+
+.level-clip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4a2a2a;
+}
+
+.level-clip.on {
+  background: var(--danger);
+}

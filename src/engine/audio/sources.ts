@@ -1,5 +1,6 @@
 import type { TimelineObject } from '../../core/model/types';
 import type { MediaSourceHandle } from '../media/mediaSource';
+import { AudioEffectChain } from './effects';
 import type { MixSources } from './mixer';
 import { AudioTrackReader, type PcmReader } from './reader';
 
@@ -12,6 +13,11 @@ export class AudioReaderPool implements MixSources {
   private readers = new Map<
     string,
     { reader: AudioTrackReader; handle: MediaSourceHandle; lastUsed: number }
+  >();
+
+  private chains = new Map<
+    string,
+    { chain: AudioEffectChain; sampleRate: number; lastUsed: number }
   >();
 
   constructor(
@@ -41,6 +47,16 @@ export class AudioReaderPool implements MixSources {
     return entry.reader;
   }
 
+  effectChain(instanceKey: string, sampleRate: number): AudioEffectChain {
+    let entry = this.chains.get(instanceKey);
+    if (!entry || entry.sampleRate !== sampleRate) {
+      entry = { chain: new AudioEffectChain(sampleRate), sampleRate, lastUsed: 0 };
+      this.chains.set(instanceKey, entry);
+    }
+    entry.lastUsed = performance.now();
+    return entry.chain;
+  }
+
   assetDuration(assetId: string): number | undefined {
     return this.getDuration(assetId);
   }
@@ -53,10 +69,12 @@ export class AudioReaderPool implements MixSources {
         this.readers.delete(id);
       }
     }
+    for (const [id, e] of this.chains) if (now - e.lastUsed > IDLE_MS) this.chains.delete(id);
   }
 
   clear(): void {
     for (const e of this.readers.values()) e.reader.dispose();
     this.readers.clear();
+    this.chains.clear();
   }
 }
