@@ -18,7 +18,7 @@ export interface ProjectSettings {
   backgroundColor: string;
 }
 
-export type AssetKind = 'video' | 'image' | 'audio' | 'font';
+export type AssetKind = 'video' | 'image' | 'audio' | 'font' | 'lut';
 
 /** 読み込んだ素材ファイルの情報（ファイルの中身は含まない） */
 export interface Asset {

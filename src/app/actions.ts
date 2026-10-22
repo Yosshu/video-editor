@@ -71,7 +71,7 @@ export function addAssetObjects(assets: Asset[], layer: number, frame: number): 
   for (const asset of assets) {
     const type: ObjectType =
       asset.kind === 'video' ? 'video' : asset.kind === 'audio' ? 'audio' : 'image';
-    if (asset.kind === 'font') continue;
+    if (asset.kind === 'font' || asset.kind === 'lut') continue;
     const length =
       asset.durationSec && (type === 'video' || type === 'audio')
         ? Math.max(1, secondsToFrames(asset.durationSec, fps))

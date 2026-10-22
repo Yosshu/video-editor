@@ -121,7 +121,7 @@ const sceneSchema = z
 const assetSchema = z
   .object({
     id: z.string().max(128),
-    kind: z.enum(['video', 'image', 'audio', 'font']),
+    kind: z.enum(['video', 'image', 'audio', 'font', 'lut']),
     name: z.string().max(4_096),
     mimeType: z.string().max(256),
     size: z.number().min(0),

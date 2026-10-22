@@ -818,4 +818,18 @@ export const EN: Record<string, string> = {
   '開いたファイルのシェーダーは、許可するまで実行しません。':
     "Shaders from an opened file don't run until you allow them.",
   実行を許可する: 'Allow',
+  'LUT（色の変換表）': 'LUT (color lookup table)',
+  'LUT ファイル（.cube）': 'LUT file (.cube)',
+  'LUT の大きさ（{0}）に対応していません。': "This LUT size ({0}) isn't supported.",
+  '1D の LUT には対応していません（3D の LUT を使ってください）。':
+    "1D LUTs aren't supported (use a 3D LUT).",
+  'LUT の数値の行が正しくありません。': 'A row of numbers in the LUT is invalid.',
+  'LUT_3D_SIZE が見つかりません。': 'LUT_3D_SIZE is missing.',
+  'LUT の数値の個数が合いません（{0} 行必要です）。':
+    'The LUT has the wrong number of values ({0} rows are needed).',
+  'LUT に数値でない値があります。': "The LUT contains a value that isn't a number.",
+  'LUT「{0}」を読み込めませんでした：{1}': 'Couldn\'t load the LUT "{0}": {1}',
+  'ファイルを読み込む…': 'Load file…',
+  'LUT はタイムラインには置かず、エフェクト「LUT（色の変換表）」で選んで使います。':
+    'LUTs aren\'t placed on the timeline. Choose them in the "LUT (color lookup table)" effect.',
 };

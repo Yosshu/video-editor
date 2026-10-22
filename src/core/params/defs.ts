@@ -1,3 +1,5 @@
+import type { AssetKind } from '../model/types';
+
 /**
  * パラメータ定義。
  * 設定パネルの入力欄、保存形式の既定値、アニメーションの可否はすべてこの定義から決まる。
@@ -56,6 +58,13 @@ export interface SceneParamDef extends ParamDefBase {
   default: string;
 }
 
+/** プロジェクトの素材を選ぶ（値は素材 ID。LUT など） */
+export interface AssetParamDef extends ParamDefBase {
+  kind: 'asset';
+  default: string;
+  assetKind: AssetKind;
+}
+
 export interface BoolParamDef extends ParamDefBase {
   kind: 'boolean';
   default: boolean;
@@ -68,6 +77,7 @@ export type ParamDef =
   | FontParamDef
   | SelectParamDef
   | SceneParamDef
+  | AssetParamDef
   | BoolParamDef;
 
 export type ResolvedValue = number | string | boolean;

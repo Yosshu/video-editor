@@ -1,5 +1,7 @@
 import { hash01 } from '../../core/animation/ease';
 import type { ResolvedParams } from '../../core/evaluate/evaluate';
+import type { Lut3D } from '../../core/lut/cube';
+import { assetRegistry } from '../media/registry';
 import { createProgram, parseColor, type Program, type RenderTarget } from '../render/gl';
 import {
   CUSTOM_HEADER,
@@ -441,6 +443,18 @@ void main() {
   float f = uFeather > 0.0 ? clamp(0.5 - e / uFeather, 0.0, 1.0) : (e <= 0.0 ? 1.0 : 0.0);
   outColor = srcAt(vec2(0.0)) * f;
 }`,
+
+  // LUT（3D の色の変換表）。格子の中心を読むよう座標を寄せる
+  lut: `
+precision highp sampler3D;
+uniform sampler3D uLut; uniform float uSize; uniform float uStrength;
+void main() {
+  vec4 c = srcAt(vec2(0.0));
+  if (c.a <= 0.0) { outColor = c; return; }
+  vec3 rgb = clamp(unpremul(c), 0.0, 1.0);
+  vec3 m = texture(uLut, rgb * (uSize - 1.0) / uSize + 0.5 / uSize).rgb;
+  outColor = vec4(clamp(mix(rgb, m, uStrength), 0.0, 1.0) * c.a, c.a);
+}`,
 };
 
 export const WIPE_KINDS: Record<string, number> = {
@@ -525,6 +539,7 @@ export class EffectRunner {
     uniforms: Record<string, UniformValue> = {},
     pad: [number, number] = [0, 0],
     extra: Record<string, RenderTarget> = {},
+    extra3d: Record<string, WebGLTexture> = {},
   ): RenderTarget {
     const gl = this.gl;
     const prog = this.program(name);
@@ -544,6 +559,13 @@ export class EffectRunner {
       gl.uniform1i(prog.uniforms[uname], unit);
       unit++;
     }
+    const first3d = unit;
+    for (const [uname, tex] of Object.entries(extra3d)) {
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_3D, tex);
+      gl.uniform1i(prog.uniforms[uname], unit);
+      unit++;
+    }
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform2f(prog.uniforms.uInSize, input.width, input.height);
     gl.uniform2f(prog.uniforms.uOutSize, out.width, out.height);
@@ -560,10 +582,46 @@ export class EffectRunner {
     // 後で描画先として使い回されても読み込みと衝突しないよう、補助テクスチャを外す
     for (let i = 1; i < unit; i++) {
       gl.activeTexture(gl.TEXTURE0 + i);
-      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.bindTexture(i >= first3d ? gl.TEXTURE_3D : gl.TEXTURE_2D, null);
     }
     gl.activeTexture(gl.TEXTURE0);
     return out;
+  }
+
+  /** LUT の 3D テクスチャ（素材 ID ごとに作って使い回す） */
+  private luts = new Map<string, { lut: Lut3D; texture: WebGLTexture }>();
+
+  lutTexture(id: string, lut: Lut3D): WebGLTexture {
+    const cached = this.luts.get(id);
+    if (cached && cached.lut === lut) return cached.texture;
+    const gl = this.gl;
+    if (cached) gl.deleteTexture(cached.texture);
+    const n = lut.size;
+    const rgba = new Float32Array(n * n * n * 4);
+    for (let i = 0; i < n * n * n; i++) {
+      rgba[i * 4] = lut.data[i * 3];
+      rgba[i * 4 + 1] = lut.data[i * 3 + 1];
+      rgba[i * 4 + 2] = lut.data[i * 3 + 2];
+      rgba[i * 4 + 3] = 1;
+    }
+    const texture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_3D, texture);
+    // 画像の読み込み用の設定（上下反転・アルファの乗算）は 3D テクスチャでは使えないので、一時的に外す
+    const flip = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+    const premultiply = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA16F, n, n, n, 0, gl.RGBA, gl.FLOAT, rgba);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flip);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultiply);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_3D, null);
+    this.luts.set(id, { lut, texture });
+    return texture;
   }
 
   release(t: RenderTarget): void {
@@ -584,6 +642,8 @@ export class EffectRunner {
   }
 
   dispose(): void {
+    for (const l of this.luts.values()) this.gl.deleteTexture(l.texture);
+    this.luts.clear();
     for (const p of this.programs.values()) this.gl.deleteProgram(p.program);
     this.programs.clear();
   }
@@ -976,6 +1036,23 @@ export const EFFECT_IMPLS: Record<string, EffectApply> = {
       [pad, pad],
     );
     return grown(input, out, pad, res);
+  },
+
+  lut: (r, input, p) => {
+    const id = String(p.lut);
+    const lut = assetRegistry.getLut(id);
+    if (!lut) return same(r, input, 'copy', {});
+    const out = r.pass(
+      'lut',
+      input.target,
+      input.target.width,
+      input.target.height,
+      { uSize: lut.size, uStrength: n(p.strength) / 100 },
+      [0, 0],
+      {},
+      { uLut: r.lutTexture(id, lut) },
+    );
+    return { target: out, width: input.width, height: input.height };
   },
 
   // 登場・退場のワイプ（内部用）

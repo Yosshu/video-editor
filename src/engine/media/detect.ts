@@ -4,6 +4,7 @@ const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'ts', 'mts', 'm2ts
 const AUDIO_EXT = ['mp3', 'wav', 'ogg', 'oga', 'opus', 'flac', 'm4a', 'aac', 'weba'];
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg', 'avif'];
 const FONT_EXT = ['ttf', 'otf', 'woff', 'woff2'];
+const LUT_EXT = ['cube'];
 
 export function extensionOf(name: string): string {
   const m = /\.([^./\\]+)$/.exec(name);
@@ -13,11 +14,14 @@ export function extensionOf(name: string): string {
 /** ファイルの種類を推定する（MIME タイプ優先、なければ拡張子） */
 export function detectAssetKind(file: { name: string; type: string }): AssetKind | null {
   const type = file.type.toLowerCase();
+  if (LUT_EXT.includes(extensionOf(file.name))) return 'lut';
   if (type.startsWith('image/')) return 'image';
   if (type.startsWith('video/')) return 'video';
   if (type.startsWith('audio/')) return 'audio';
   if (type.startsWith('font/')) return 'font';
   const ext = extensionOf(file.name);
+  // .cube は MIME タイプが付かないか、不正確なことが多いので拡張子を先に見る
+  if (LUT_EXT.includes(ext)) return 'lut';
   if (VIDEO_EXT.includes(ext)) return 'video';
   if (AUDIO_EXT.includes(ext)) return 'audio';
   if (IMAGE_EXT.includes(ext)) return 'image';
@@ -35,6 +39,6 @@ export function isPackageFileName(name: string): boolean {
   return extensionOf(name) === 'vedpack';
 }
 
-export const MEDIA_ACCEPT = [...VIDEO_EXT, ...AUDIO_EXT, ...IMAGE_EXT]
+export const MEDIA_ACCEPT = [...VIDEO_EXT, ...AUDIO_EXT, ...IMAGE_EXT, ...LUT_EXT]
   .map((e) => `.${e}`)
   .join(',');

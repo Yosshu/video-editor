@@ -581,6 +581,15 @@ const VIDEO_EFFECTS: EffectDef[] = [
 /** 変形・光・加工などの映像エフェクト（Phase 7 で追加） */
 const MORE_VIDEO_EFFECTS: EffectDef[] = [
   {
+    type: 'lut',
+    label: 'LUT（色の変換表）',
+    category: '色',
+    params: [
+      { id: 'lut', label: 'LUT ファイル（.cube）', kind: 'asset', assetKind: 'lut', default: '' },
+      numberParam('strength', '強さ', 100, { min: 0, max: 100, step: 0.1, unit: '%' }),
+    ],
+  },
+  {
     type: 'mirror',
     label: 'ミラー',
     category: '変形',

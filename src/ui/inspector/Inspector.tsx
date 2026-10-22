@@ -39,7 +39,14 @@ import type {
   TimelineObject,
 } from '../../core/model/types';
 import { COLLAPSED_GROUPS, getObjectDef } from '../../core/objects/definitions';
-import type { NumberParamDef, ParamDef, SceneParamDef } from '../../core/params/defs';
+import type {
+  AssetParamDef,
+  NumberParamDef,
+  ParamDef,
+  SceneParamDef,
+} from '../../core/params/defs';
+import { importMediaFiles } from '../../app/assets';
+import { pickFilesWithInput } from '../../storage/filePicker';
 import { currentScene, useEditor } from '../../state/store';
 import { EaseEditor } from './EaseEditor';
 import {
@@ -387,7 +394,61 @@ function ParamField({
       return (
         <SceneParamField def={def} value={String(value)} onChange={change} disabled={disabled} />
       );
+    case 'asset':
+      return (
+        <AssetParamField def={def} value={String(value)} onChange={change} disabled={disabled} />
+      );
   }
+}
+
+/** プロジェクトの素材を選ぶ（LUT など）。ファイルから読み込んで選ぶこともできる */
+function AssetParamField({
+  def,
+  value,
+  onChange,
+  disabled,
+}: {
+  def: AssetParamDef;
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+}) {
+  const id = useId();
+  const assets = useEditor((s) => s.project.assets).filter((a) => a.kind === def.assetKind);
+  const status = useEditor((s) => s.assetStatus[value]);
+  return (
+    <div className="field">
+      <div className="field-label-row">
+        <label htmlFor={id} className="field-label">
+          {t(def.label)}
+        </label>
+        {!disabled && (
+          <button
+            type="button"
+            className="link-button"
+            onClick={async () => {
+              const files = await pickFilesWithInput({ accept: '.cube', multiple: false });
+              const [asset] = await importMediaFiles(files.map((file) => ({ file })));
+              if (asset) onChange(asset.id);
+            }}
+          >
+            {t('ファイルを読み込む…')}
+          </button>
+        )}
+      </div>
+      <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{t('（選択してください）')}</option>
+        {assets.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </select>
+      {value && (status === 'missing' || status === 'error') && (
+        <p className="error-text">{t('ファイルが見つかりません')}</p>
+      )}
+    </div>
+  );
 }
 
 /** 表示するシーンを選ぶ（循環するシーンは選べない） */

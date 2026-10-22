@@ -1,5 +1,6 @@
 import type { Asset, AssetKind } from '../../core/model/types';
 import { newId } from '../../core/model/ids';
+import { parseCube, type Lut3D } from '../../core/lut/cube';
 import { detectAssetKind } from './detect';
 import { computeFingerprint } from './fingerprint';
 import { describeMedia, openMediaSource, type MediaSourceHandle } from './mediaSource';
@@ -11,6 +12,21 @@ interface Runtime {
   file: File;
   image?: ImageBitmap;
   media?: MediaSourceHandle;
+  lut?: Lut3D;
+}
+
+async function readLut(file: File): Promise<Lut3D> {
+  try {
+    return parseCube(await file.text());
+  } catch (e) {
+    throw new AssetImportError(
+      t(
+        'LUT「{0}」を読み込めませんでした：{1}',
+        file.name,
+        e instanceof Error ? e.message : String(e),
+      ),
+    );
+  }
 }
 
 async function decodeImage(file: Blob): Promise<ImageBitmap> {
@@ -63,6 +79,10 @@ export class AssetRegistry {
     return this.runtimes.get(assetId)?.media;
   }
 
+  getLut(assetId: string): Lut3D | undefined {
+    return this.runtimes.get(assetId)?.lut;
+  }
+
   /** ファイルを解析して素材情報を作り、そのまま使える状態にする */
   async importFile(file: File, kindHint?: AssetKind): Promise<Asset> {
     const kind = kindHint ?? detectAssetKind(file);
@@ -78,6 +98,13 @@ export class AssetRegistry {
       lastModified: file.lastModified,
       fingerprint,
     };
+    if (kind === 'lut') {
+      const lut = await readLut(file);
+      const asset: Asset = { ...base, kind: 'lut', mimeType: 'text/plain' };
+      this.runtimes.set(asset.id, { file, lut });
+      this.emit(asset.id);
+      return asset;
+    }
     if (kind === 'image') {
       let image: ImageBitmap;
       try {
@@ -112,6 +139,8 @@ export class AssetRegistry {
     } else if (asset.kind === 'video' || asset.kind === 'audio') {
       const media = await openMediaSource(file);
       this.runtimes.set(asset.id, { file, media });
+    } else if (asset.kind === 'lut') {
+      this.runtimes.set(asset.id, { file, lut: await readLut(file) });
     } else {
       this.runtimes.set(asset.id, { file });
     }

@@ -23,6 +23,7 @@ const KIND_LABEL: Record<Asset['kind'], string> = {
   image: '画像',
   audio: '音声',
   font: 'フォント',
+  lut: 'LUT',
 };
 
 async function pickMediaFiles(multiple = true): Promise<IncomingFile[]> {
@@ -49,6 +50,10 @@ async function pickMediaFiles(multiple = true): Promise<IncomingFile[]> {
 
 /** 再生位置で空いている最初のレイヤーに素材を置く */
 function addToTimeline(asset: Asset): void {
+  if (asset.kind === 'lut') {
+    notify(t('LUT はタイムラインには置かず、エフェクト「LUT（色の変換表）」で選んで使います。'));
+    return;
+  }
   const state = getState();
   const scene = currentScene(state);
   const length = 1;
@@ -94,8 +99,13 @@ export function MediaBin() {
   };
 
   const removeAsset = (asset: Asset) => {
+    // オブジェクトの素材のほか、エフェクトのパラメータ（LUT など）で使われていないかも調べる
     const used = getState().project.scenes.some((s) =>
-      s.objects.some((o) => o.assetId === asset.id),
+      s.objects.some(
+        (o) =>
+          o.assetId === asset.id ||
+          o.effects.some((e) => Object.values(e.params).includes(asset.id)),
+      ),
     );
     if (used) {
       notify(t('タイムラインで使われている素材は削除できません。'), 'error');
