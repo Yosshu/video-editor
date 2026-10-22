@@ -126,6 +126,10 @@ export interface LayerState {
   name?: string;
   hidden?: boolean;
   locked?: boolean;
+  /** このレイヤーの下に続く何レイヤーを 1 つのまとまりにするか（タイムラインで折りたためる） */
+  fold?: number;
+  /** まとまりを折りたたんでいるか */
+  collapsed?: boolean;
 }
 
 export interface Scene {

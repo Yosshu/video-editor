@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   addAssetObjects,
   addObject,
@@ -13,6 +13,16 @@ import {
   updateLayer,
 } from '../../app/actions';
 import { moveMidpointOf } from '../../app/animationActions';
+import {
+  closeGapAt,
+  deleteLayerAt,
+  inheritFromPrevious,
+  insertLayerAt,
+  packLayerAt,
+  rippleDeleteSelection,
+  setLayerFold,
+  toggleLayerCollapsed,
+} from '../../app/timelineActions';
 import { referableScenes } from '../../app/sceneActions';
 import { sceneObjectLength } from '../../engine/compose';
 import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
@@ -31,6 +41,7 @@ import {
   resolveResize,
   sceneDuration,
 } from '../../core/timeline/ops';
+import { foldHeaderOf, gapAt, visibleLayerRows } from '../../core/timeline/structure';
 import { isProjectFileName, MEDIA_ACCEPT } from '../../engine/media/detect';
 import { pickFilesWithInput } from '../../storage/filePicker';
 import { playback } from '../../engine/playback/Playback';
@@ -95,6 +106,7 @@ const ObjectItem = memo(function ObjectItem({
   fps,
   assetDuration,
   ghost,
+  row,
 }: {
   obj: TimelineObject;
   label: string;
@@ -104,9 +116,10 @@ const ObjectItem = memo(function ObjectItem({
   fps: Rational;
   assetDuration: number;
   ghost?: { layer: number; start: number; length: number };
+  /** 表示する行（折りたたみを考えたレイヤーの位置） */
+  row: number;
 }) {
   const def = getObjectDef(obj.type);
-  const layer = ghost?.layer ?? obj.layer;
   const start = ghost?.start ?? obj.start;
   const length = ghost?.length ?? obj.length;
   const width = Math.max(2, length * ppf);
@@ -122,7 +135,7 @@ const ObjectItem = memo(function ObjectItem({
       data-object-id={obj.id}
       style={{
         left: start * ppf,
-        top: (layer - 1) * LAYER_H + 2,
+        top: row * LAYER_H + 2,
         width,
         height: LAYER_H - 4,
         backgroundColor: def.color,
@@ -214,60 +227,109 @@ function Ruler({
   );
 }
 
-function LayerHeaders({ scene }: { scene: Scene }) {
-  const rows: React.ReactNode[] = [];
-  for (let i = 1; i <= MAX_LAYERS; i++) {
-    const st = scene.layers.find((l) => l.index === i);
-    const rename = () => {
-      const name = window.prompt(`レイヤー ${i} の名前`, st?.name ?? '');
-      if (name !== null) updateLayer(i, { name: name.trim() });
-    };
-    rows.push(
-      <div
-        key={i}
-        className={`tl-layer-header ${st?.hidden ? 'hidden-layer' : ''} ${st?.locked ? 'locked-layer' : ''}`}
-        style={{ height: LAYER_H }}
-        onDoubleClick={rename}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          openContextMenu(e.clientX, e.clientY, [
-            { label: '名前を変更…', action: rename },
-            {
-              label: st?.hidden ? '表示する' : '非表示にする',
-              action: () => updateLayer(i, { hidden: !st?.hidden }),
-            },
-            {
-              label: st?.locked ? 'ロックを解除' : 'ロックする',
-              action: () => updateLayer(i, { locked: !st?.locked }),
-            },
-          ]);
-        }}
-      >
-        <button
-          type="button"
-          className={`layer-toggle ${st?.hidden ? 'off' : ''}`}
-          title={st?.hidden ? '表示する' : '非表示にする'}
-          aria-label={`レイヤー ${i} の表示切り替え`}
-          onClick={() => updateLayer(i, { hidden: !st?.hidden })}
-        >
-          {st?.hidden ? '○' : '●'}
-        </button>
-        <span className="layer-name" title={st?.name ?? `Layer ${i}`}>
-          {st?.name || `Layer ${i}`}
-        </span>
-        <button
-          type="button"
-          className={`layer-toggle ${st?.locked ? 'on' : 'off'}`}
-          title={st?.locked ? 'ロックを解除' : 'ロックする'}
-          aria-label={`レイヤー ${i} のロック切り替え`}
-          onClick={() => updateLayer(i, { locked: !st?.locked })}
-        >
-          {st?.locked ? '🔒' : '🔓'}
-        </button>
-      </div>,
-    );
-  }
-  return <div className="tl-headers">{rows}</div>;
+function LayerHeaders({ scene, rows }: { scene: Scene; rows: number[] }) {
+  return (
+    <div className="tl-headers">
+      {rows.map((i) => {
+        const st = scene.layers.find((l) => l.index === i);
+        const header = foldHeaderOf(scene.layers, i);
+        const rename = () => {
+          const name = window.prompt(`レイヤー ${i} の名前`, st?.name ?? '');
+          if (name !== null) updateLayer(i, { name: name.trim() });
+        };
+        const makeFold = () => {
+          const input = window.prompt(
+            `レイヤー ${i} の下の何レイヤーをまとめますか？（まとめるとタイムラインで折りたためます）`,
+            String(st?.fold ?? 3),
+          );
+          if (input === null) return;
+          const count = Math.floor(Number(input));
+          if (Number.isFinite(count) && count >= 0)
+            setLayerFold(i, Math.min(count, MAX_LAYERS - i));
+        };
+        return (
+          <div
+            key={i}
+            className={`tl-layer-header ${st?.hidden ? 'hidden-layer' : ''} ${st?.locked ? 'locked-layer' : ''} ${header ? 'in-fold' : ''} ${st?.fold ? 'fold-header' : ''}`}
+            style={{ height: LAYER_H }}
+            data-layer={i}
+            onDoubleClick={rename}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              openContextMenu(e.clientX, e.clientY, [
+                { label: '名前を変更…', action: rename },
+                {
+                  label: st?.hidden ? '表示する' : '非表示にする',
+                  action: () => updateLayer(i, { hidden: !st?.hidden }),
+                },
+                {
+                  label: st?.locked ? 'ロックを解除' : 'ロックする',
+                  action: () => updateLayer(i, { locked: !st?.locked }),
+                },
+                'separator',
+                { label: 'この位置にレイヤーを挿入', action: () => insertLayerAt(i) },
+                { label: 'このレイヤーを削除（中身ごと）', action: () => deleteLayerAt(i) },
+                { label: 'レイヤーの空白をすべて詰める', action: () => packLayerAt(i) },
+                'separator',
+                {
+                  label: st?.fold ? 'まとめるレイヤー数を変更…' : '下のレイヤーとまとめる…',
+                  action: makeFold,
+                },
+                ...(st?.fold
+                  ? [
+                      {
+                        label: st.collapsed ? 'まとまりを開く' : 'まとまりを折りたたむ',
+                        action: () => toggleLayerCollapsed(i),
+                      },
+                      { label: 'まとまりを解除', action: () => setLayerFold(i, 0) },
+                    ]
+                  : []),
+              ]);
+            }}
+          >
+            {st?.fold ? (
+              <button
+                type="button"
+                className="layer-fold"
+                title={st.collapsed ? 'まとまりを開く' : 'まとまりを折りたたむ'}
+                aria-label={`レイヤー ${i} のまとまりを${st.collapsed ? '開く' : '折りたたむ'}`}
+                aria-expanded={!st.collapsed}
+                onClick={() => toggleLayerCollapsed(i)}
+              >
+                {st.collapsed ? '▸' : '▾'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={`layer-toggle ${st?.hidden ? 'off' : ''}`}
+              title={st?.hidden ? '表示する' : '非表示にする'}
+              aria-label={`レイヤー ${i} の表示切り替え`}
+              onClick={() => updateLayer(i, { hidden: !st?.hidden })}
+            >
+              {st?.hidden ? '○' : '●'}
+            </button>
+            <span className="layer-name" title={st?.name ?? `Layer ${i}`}>
+              {st?.name || `Layer ${i}`}
+            </span>
+            {st?.fold && st.collapsed ? (
+              <span className="fold-count" title={`${st.fold} レイヤーを折りたたみ中`}>
+                +{st.fold}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className={`layer-toggle ${st?.locked ? 'on' : 'off'}`}
+              title={st?.locked ? 'ロックを解除' : 'ロックする'}
+              aria-label={`レイヤー ${i} のロック切り替え`}
+              onClick={() => updateLayer(i, { locked: !st?.locked })}
+            >
+              {st?.locked ? '🔒' : '🔓'}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function PlayheadLine({ ppf, height }: { ppf: number; height: number }) {
@@ -304,7 +366,14 @@ export function Timeline() {
     Math.ceil(viewport.width / ppf) + 1,
   );
   const contentWidth = Math.ceil(contentFrames * ppf);
-  const tracksHeight = MAX_LAYERS * LAYER_H;
+  // 折りたたみを考えた、表示するレイヤーの並び
+  const rows = useMemo(() => visibleLayerRows(scene.layers), [scene.layers]);
+  const rowIndex = useMemo(() => new Map(rows.map((l, i) => [l, i])), [rows]);
+  /** レイヤーを表示する行（折りたたまれていれば、まとまりの先頭の行） */
+  const rowOf = (layer: number) =>
+    rowIndex.get(layer) ?? rowIndex.get(foldHeaderOf(scene.layers, layer)?.index ?? 1) ?? 0;
+  const layerAtRow = (row: number) => rows[Math.max(0, Math.min(rows.length - 1, row))];
+  const tracksHeight = rows.length * LAYER_H;
   const selectedSet = new Set(selection);
   const lockedLayers = new Set(scene.layers.filter((l) => l.locked).map((l) => l.index));
   const hiddenLayers = new Set(scene.layers.filter((l) => l.hidden).map((l) => l.index));
@@ -394,7 +463,7 @@ export function Timeline() {
       x,
       y,
       frame: Math.max(0, Math.round(x / ppf)),
-      layer: clampLayer(Math.floor(y / LAYER_H) + 1),
+      layer: clampLayer(layerAtRow(Math.floor(y / LAYER_H))),
     };
   };
 
@@ -435,7 +504,7 @@ export function Timeline() {
       const snap = snapEnabled && !ev.altKey;
       if (mode === 'move') {
         let df = Math.round((p.x - origin.x) / ppf);
-        const dl = Math.floor(p.y / LAYER_H) - Math.floor(origin.y / LAYER_H);
+        const dl = p.layer - origin.layer;
         if (snap) {
           const edges = moving.flatMap((o) => [o.start + df, objectEnd(o) + df]);
           const off = findSnapOffset(edges, snapPoints, threshold);
@@ -551,10 +620,13 @@ export function Timeline() {
       setBand({ x0: origin.x, y0: origin.y, x1: p.x, y1: p.y });
       const f0 = Math.min(origin.x, p.x) / ppf;
       const f1 = Math.max(origin.x, p.x) / ppf;
-      const l0 = Math.floor(Math.min(origin.y, p.y) / LAYER_H) + 1;
-      const l1 = Math.floor(Math.max(origin.y, p.y) / LAYER_H) + 1;
+      const r0 = Math.floor(Math.min(origin.y, p.y) / LAYER_H);
+      const r1 = Math.floor(Math.max(origin.y, p.y) / LAYER_H);
       const hits = scene.objects
-        .filter((o) => o.layer >= l0 && o.layer <= l1 && o.start < f1 && objectEnd(o) > f0)
+        .filter((o) => {
+          const r = rowIndex.get(o.layer);
+          return r !== undefined && r >= r0 && r <= r1 && o.start < f1 && objectEnd(o) > f0;
+        })
         .map((o) => o.id);
       setSelection([...new Set([...base, ...hits])]);
     };
@@ -590,8 +662,10 @@ export function Timeline() {
         },
         { label: '複製', shortcut: 'Ctrl+D', action: duplicateSelection },
         { label: 'コピー', shortcut: 'Ctrl+C', action: copySelection },
+        { label: '前のオブジェクトの終了時の値を引き継ぐ', action: () => inheritFromPrevious(id) },
         'separator',
         { label: '削除', shortcut: 'Delete', action: deleteSelection },
+        { label: '削除して後ろを詰める', shortcut: 'Shift+Delete', action: rippleDeleteSelection },
       ]);
       return;
     }
@@ -625,6 +699,17 @@ export function Timeline() {
           const imported = await importMediaFiles(files.map((file) => ({ file })));
           addAssetObjects(imported, layer, frame);
         },
+      },
+      'separator',
+      {
+        label: '空白を詰める（このレイヤー）',
+        disabled: !gapAt(scene, frame, layer),
+        action: () => closeGapAt(frame, layer),
+      },
+      {
+        label: '空白を詰める（すべてのレイヤー）',
+        disabled: !gapAt(scene, frame),
+        action: () => closeGapAt(frame),
       },
       'separator',
       {
@@ -677,18 +762,21 @@ export function Timeline() {
   // 見えている範囲のオブジェクトだけ描く
   const visibleFrom = viewport.scrollLeft / ppf - 10;
   const visibleTo = (viewport.scrollLeft + viewport.width) / ppf + 10;
-  const visibleLayerFrom = Math.floor(viewport.scrollTop / LAYER_H);
-  const visibleLayerTo = Math.ceil((viewport.scrollTop + viewport.height) / LAYER_H) + 1;
+  const visibleRowFrom = Math.floor(viewport.scrollTop / LAYER_H) - 1;
+  const visibleRowTo = Math.ceil((viewport.scrollTop + viewport.height) / LAYER_H) + 1;
   const visibleObjects = scene.objects.filter((o) => {
     const g = ghost?.get(o.id);
     const start = g?.start ?? o.start;
     const layer = g?.layer ?? o.layer;
     const len = g?.length ?? o.length;
+    // 折りたたまれたレイヤーのオブジェクトは描かない（ドラッグ中は表示する）
+    if (!g && !rowIndex.has(layer)) return false;
+    const row = rowOf(layer);
     return (
       start + len >= visibleFrom &&
       start <= visibleTo &&
-      layer >= visibleLayerFrom &&
-      layer <= visibleLayerTo + 1
+      row >= visibleRowFrom &&
+      row <= visibleRowTo
     );
   });
 
@@ -741,7 +829,7 @@ export function Timeline() {
         >
           <div className="tl-corner" />
           <Ruler ppf={ppf} viewport={viewport} contentWidth={contentWidth} />
-          <LayerHeaders scene={scene} />
+          <LayerHeaders scene={scene} rows={rows} />
           <div
             className="tl-tracks"
             ref={tracksRef}
@@ -753,13 +841,15 @@ export function Timeline() {
             onDrop={onDrop}
             data-testid="timeline-tracks"
           >
-            {[...hiddenLayers].map((l) => (
-              <div
-                key={`h${l}`}
-                className="tl-hidden-row"
-                style={{ top: (l - 1) * LAYER_H, height: LAYER_H }}
-              />
-            ))}
+            {[...hiddenLayers]
+              .filter((l) => rowIndex.has(l))
+              .map((l) => (
+                <div
+                  key={`h${l}`}
+                  className="tl-hidden-row"
+                  style={{ top: rowOf(l) * LAYER_H, height: LAYER_H }}
+                />
+              ))}
             {visibleObjects.map((o) => (
               <ObjectItem
                 key={o.id}
@@ -771,6 +861,7 @@ export function Timeline() {
                 fps={fps}
                 assetDuration={assets.find((a) => a.id === o.assetId)?.durationSec ?? 0}
                 ghost={ghost?.get(o.id)}
+                row={rowOf(ghost?.get(o.id)?.layer ?? o.layer)}
               />
             ))}
             {dropTarget && (
@@ -778,7 +869,7 @@ export function Timeline() {
                 className="tl-drop-marker"
                 style={{
                   left: dropTarget.frame * ppf,
-                  top: (dropTarget.layer - 1) * LAYER_H,
+                  top: rowOf(dropTarget.layer) * LAYER_H,
                   height: LAYER_H,
                 }}
               />

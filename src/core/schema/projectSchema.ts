@@ -71,6 +71,8 @@ const layerSchema = z
     name: z.string().max(1_000).optional(),
     hidden: z.boolean().optional(),
     locked: z.boolean().optional(),
+    fold: z.number().int().min(0).max(10_000).optional(),
+    collapsed: z.boolean().optional(),
   })
   .loose();
 

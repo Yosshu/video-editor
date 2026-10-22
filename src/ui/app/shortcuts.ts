@@ -11,6 +11,7 @@ import {
   stepFrames,
 } from '../../app/actions';
 import { pickAndOpenProject, saveProject } from '../../app/projectFile';
+import { rippleDeleteSelection } from '../../app/timelineActions';
 import { fpsValue } from '../../core/model/time';
 import { playback } from '../../engine/playback/Playback';
 import { getState, redo, setSelection, undo } from '../../state/store';
@@ -22,6 +23,7 @@ export const SHORTCUTS: { keys: string; label: string }[] = [
   { keys: 'Home / End', label: '先頭 / 末尾へ移動' },
   { keys: 'S', label: '再生位置で分割' },
   { keys: 'Delete', label: '選択したオブジェクトを削除' },
+  { keys: 'Shift + Delete', label: '削除して後ろを詰める（リップル削除）' },
   { keys: 'Ctrl + Z / Ctrl + Y', label: '元に戻す / やり直し' },
   { keys: 'Ctrl + C / X / V', label: 'コピー / 切り取り / 貼り付け' },
   { keys: 'Ctrl + D', label: '複製' },
@@ -120,7 +122,8 @@ export function handleShortcut(e: KeyboardEvent): void {
         return true;
       case 'Delete':
       case 'Backspace':
-        deleteSelection();
+        if (e.shiftKey) rippleDeleteSelection();
+        else deleteSelection();
         return true;
       case 'Escape':
         setSelection([]);
