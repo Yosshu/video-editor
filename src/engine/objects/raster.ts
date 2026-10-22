@@ -1,4 +1,6 @@
 import type { ResolvedParams } from '../../core/evaluate/evaluate';
+import type { Particle } from '../../core/particles/particles';
+import { parseColor } from '../render/gl';
 
 /** テキスト・図形をビットマップにした結果 */
 export interface Raster {
@@ -275,6 +277,75 @@ export function rasterizeWave(
     if (style === 'mirror') ctx.fillRect(x, (h - bh) / 2, barW, bh);
     else ctx.fillRect(x, h - bh, barW, bh);
   });
+  return result;
+}
+
+/** 粒子を描く範囲の上限（中心から上下左右それぞれ、px） */
+const MAX_PARTICLE_EXTENT = 4096;
+
+/**
+ * パーティクルを描画する。画像の中心が発生位置になるよう、上下・左右に同じだけ広げた大きさにする
+ */
+export function rasterizeParticles(
+  particles: Particle[],
+  p: ResolvedParams,
+  scale: number,
+): Raster {
+  let ex = 1;
+  let ey = 1;
+  for (const q of particles) {
+    ex = Math.max(ex, Math.abs(q.x) + q.size);
+    ey = Math.max(ey, Math.abs(q.y) + q.size);
+  }
+  ex = Math.min(ex, MAX_PARTICLE_EXTENT);
+  ey = Math.min(ey, MAX_PARTICLE_EXTENT);
+  const canvas = createCanvas(ex * 2 * scale, ey * 2 * scale);
+  const result = { canvas, width: canvas.width / scale, height: canvas.height / scale };
+  const ctx = canvas.getContext('2d')!;
+  const c1 = parseColor(String(p.color)).map((v) => v * 255);
+  const c2 = parseColor(String(p.color2)).map((v) => v * 255);
+  const colorOf = (mix: number) =>
+    `rgb(${c1.map((v, i) => Math.round(v + (c2[i] - v) * mix)).join(',')})`;
+  const shape = String(p.shape);
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  for (const q of particles) {
+    const r = (q.size * scale) / 2;
+    if (r <= 0 || q.opacity <= 0) continue;
+    const x = cx + q.x * scale;
+    const y = cy + q.y * scale;
+    const color = colorOf(q.mix);
+    ctx.globalAlpha = Math.min(1, q.opacity);
+    if (shape === 'glow') {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, color);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      continue;
+    }
+    ctx.fillStyle = color;
+    if (shape === 'circle') {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((q.rotation * Math.PI) / 180);
+    if (shape === 'star') {
+      ctx.beginPath();
+      starPoints(r * 2, r * 2, 0, 0, 0.45).forEach(([px, py], i) =>
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py),
+      );
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillRect(-r, -r, r * 2, r * 2);
+    }
+    ctx.restore();
+  }
   return result;
 }
 

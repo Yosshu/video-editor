@@ -723,6 +723,7 @@ export function Timeline() {
       { label: t('テキストを追加'), action: add('text') },
       { label: t('図形を追加'), action: add('shape') },
       { label: t('単色を追加'), action: add('solid') },
+      { label: t('パーティクルを追加'), action: add('particles') },
       {
         label: t('シーンを追加（別のシーンを素材にする）'),
         disabled: otherScenes.length === 0,

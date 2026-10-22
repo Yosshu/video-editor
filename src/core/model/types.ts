@@ -125,7 +125,8 @@ export type ObjectType =
   | 'timeControl'
   | 'partialFilter'
   | 'camera'
-  | 'audioWave';
+  | 'audioWave'
+  | 'particles';
 
 /** タイムライン上のオブジェクト */
 export interface TimelineObject {

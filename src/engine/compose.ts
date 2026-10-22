@@ -1,12 +1,14 @@
 import { evaluateFrame, inRange, type VisualItem } from '../core/evaluate/evaluate';
 import { fpsValue, framesToSeconds } from '../core/model/time';
 import type { Project, Scene } from '../core/model/types';
-import type { BlendMode } from '../core/objects/definitions';
+import { PARTICLE_PARAM_IDS, type BlendMode } from '../core/objects/definitions';
+import { simulateParticles } from '../core/particles/particles';
 import { sceneDuration } from '../core/timeline/ops';
 import { DEFAULT_FOCAL, type Mat3 } from './render/gl';
 import type { CameraView, DrawItem, Region, RenderOp } from './render/Renderer';
 import {
   RasterCache,
+  rasterizeParticles,
   rasterizeShape,
   rasterizeSolid,
   rasterizeText,
@@ -287,6 +289,24 @@ export class Compositor {
         ctx.rasterIds.add(id);
         const raster = this.rasters.get(id, key, () =>
           rasterizeWave(p, rs, peaks, src?.time ?? 0, src?.speed ?? 1),
+        );
+        return {
+          ...base,
+          source: raster.canvas,
+          version: raster,
+          mipmap: true,
+          width: raster.width,
+          height: raster.height,
+        };
+      }
+      case 'particles': {
+        const rs = pixelScale * rasterUpscale(Number(p.scale));
+        const time = framesToSeconds(item.localFrame, project.settings.fps);
+        // 粒子の位置は毎フレーム変わるので、時刻も鍵に含める
+        const key = JSON.stringify([time, rs, ...PARTICLE_PARAM_IDS.map((k) => p[k])]);
+        ctx.rasterIds.add(id);
+        const raster = this.rasters.get(id, key, () =>
+          rasterizeParticles(simulateParticles(p, time), p, rs),
         );
         return {
           ...base,
