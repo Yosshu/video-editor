@@ -52,6 +52,36 @@ describe('mixScene', () => {
     expect(l[2500]).toBe(0);
   });
 
+  it('「音程を保つ」なら、速度を変えても音の高さが変わらない', async () => {
+    // 48kHz・440Hz の音を 2 倍速で再生する
+    const sine: PcmReader = {
+      read: async (start, end) => {
+        const n = Math.round((end - start) * 48000);
+        const ch = Float32Array.from({ length: n }, (_, i) =>
+          Math.sin(2 * Math.PI * 440 * (start + i / 48000)),
+        );
+        return { start, sampleRate: 48000, channels: [ch] };
+      },
+      dispose: () => undefined,
+    };
+    const project = createProject({ sampleRate: 48000, fps: { num: 10, den: 1 } });
+    const crossings = async (keepPitch: boolean) => {
+      project.scenes[0].objects = [
+        createObject('audio', 1, 0, 10, { assetId: 'a', params: { speed: 200, keepPitch } }),
+      ];
+      const sources: MixSources = { reader: () => sine, assetDuration: () => 10 };
+      const [l] = await mixScene(project, project.scenes[0], 0.2, 24000, sources);
+      let c = 0;
+      for (let i = 1; i < l.length; i++) if (l[i - 1] < 0 !== l[i] < 0) c++;
+      // 0.5 秒間のゼロ交差の数 → 周波数
+      return c;
+    };
+    expect(await crossings(false)).toBeGreaterThan(860);
+    const kept = await crossings(true);
+    expect(kept).toBeGreaterThan(420);
+    expect(kept).toBeLessThan(460);
+  });
+
   it('音量・パン・フェードを適用する', async () => {
     const obj = createObject('audio', 1, 0, 20, {
       assetId: 'a',

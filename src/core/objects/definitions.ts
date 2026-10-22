@@ -331,6 +331,14 @@ const PLAYBACK_PARAMS: ParamDef[] = [
     group: '再生',
   },
   { id: 'loop', label: 'ループ再生', kind: 'boolean', default: false, group: '再生' },
+  {
+    id: 'keepPitch',
+    label: '速度を変えても音程を保つ',
+    kind: 'boolean',
+    default: false,
+    group: '再生',
+    visibleIf: (v) => v.speed !== 100,
+  },
 ];
 
 const AUDIO_PARAMS: ParamDef[] = [

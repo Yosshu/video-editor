@@ -12,6 +12,7 @@ import { getObjectDef } from '../../core/objects/definitions';
 import { sceneDuration } from '../../core/timeline/ops';
 import { AudioEffectChain } from './effects';
 import type { PcmReader } from './reader';
+import { readLooped, stretch, StretchCache } from './timeStretch';
 
 export interface MixSources {
   /**
@@ -25,6 +26,8 @@ export interface MixSources {
    * 用意しない場合は毎回作り直す（毎回、少し前から処理し直すので遅いが結果は同じ）
    */
   effectChain?(instanceKey: string, sampleRate: number): AudioEffectChain;
+  /** 音程を保った速度変更の状態（続きの区間に引き継ぐ）。用意しない場合は区間ごとに決める */
+  stretchCache?(instanceKey: string): StretchCache;
 }
 
 /** 入れ子のシーンの深さの上限 */
@@ -75,6 +78,7 @@ interface ObjectSource {
   /** シーン内での開始・終了時刻（秒） */
   start: number;
   end: number;
+  stretch?: StretchCache;
 }
 
 /**
@@ -116,48 +120,71 @@ async function renderObject(
   };
   const unwrapped = (i: number) => offset + (t0 + i / sr - src.start) * speed;
 
-  // ループで素材の終わりをまたぐ場合は区間を分ける
-  const segments: [number, number, number][] = [];
-  if (loop && duration && duration > 0) {
-    let i = i0;
-    while (i < i1) {
-      const st = unwrapped(i);
-      const local = ((st % duration) + duration) % duration;
-      const untilWrap = Math.max(1, Math.ceil(((duration - local) / speed) * sr - 1e-9));
-      const end = Math.min(i1, i + untilWrap);
-      segments.push([i, end, local]);
-      i = end;
-    }
+  // まず素材の音（速度を変えたもの）を作り、そのあと音量・パン・フェードをかける
+  if (p.keepPitch === true && Math.abs(speed - 1) > 1e-6) {
+    // 音程を保ったまま速度を変える
+    const read = (from: number, to: number) =>
+      loop && duration && duration > 0
+        ? readLooped(reader, duration, from, to)
+        : reader.read(Math.max(0, from), Math.max(0, to));
+    const signature = [speed, offset, loop, duration, sr, src.start].join('|');
+    const [sl, sr2] = await stretch(
+      read,
+      (local) => offset + local * speed,
+      t0 + i0 / sr - src.start,
+      i1 - i0,
+      sr,
+      src.stretch?.use(signature),
+    );
+    l.set(sl, i0);
+    r.set(sr2, i0);
   } else {
-    segments.push([i0, i1, unwrapped(i0)]);
-  }
-
-  for (const [a, b, srcStart] of segments) {
-    const srcEnd = srcStart + ((b - a) / sr) * speed;
-    const span = await reader.read(Math.max(0, srcStart - 2 / sr), srcEnd + 2 / sr);
-    const L = span.channels[0];
-    const R = span.channels[1] ?? span.channels[0];
-    const srcRate = span.sampleRate;
-    for (let block = a; block < b; block += BLOCK) {
-      const blockEnd = Math.min(b, block + BLOCK);
-      // 音量・パン・フェードはブロック単位で評価する
-      const tl = t0 + block / sr;
-      const localFrame = secondsToFrames(tl - src.start, fps);
-      const vals = paramsAt(localFrame);
-      const volume = Number(vals.volume ?? 100) / 100;
-      const [gl, gr] = panGains(Number(vals.pan ?? 0));
-      const fade = fadeFactor(tl - src.start, objDuration, fadeIn, fadeOut);
-      const gain = volume * fade;
-      if (gain === 0) continue;
-      for (let i = block; i < blockEnd; i++) {
+    // ループで素材の終わりをまたぐ場合は区間を分ける
+    const segments: [number, number, number][] = [];
+    if (loop && duration && duration > 0) {
+      let i = i0;
+      while (i < i1) {
+        const st = unwrapped(i);
+        const local = ((st % duration) + duration) % duration;
+        const untilWrap = Math.max(1, Math.ceil(((duration - local) / speed) * sr - 1e-9));
+        const end = Math.min(i1, i + untilWrap);
+        segments.push([i, end, local]);
+        i = end;
+      }
+    } else {
+      segments.push([i0, i1, unwrapped(i0)]);
+    }
+    for (const [a, b, srcStart] of segments) {
+      const srcEnd = srcStart + ((b - a) / sr) * speed;
+      const span = await reader.read(Math.max(0, srcStart - 2 / sr), srcEnd + 2 / sr);
+      const L = span.channels[0];
+      const R = span.channels[1] ?? span.channels[0];
+      const srcRate = span.sampleRate;
+      for (let i = a; i < b; i++) {
         const pos = (srcStart + ((i - a) / sr) * speed - span.start) * srcRate;
         const idx = Math.floor(pos);
         if (idx < 0 || idx >= L.length) continue;
         const frac = pos - idx;
         const next = Math.min(idx + 1, L.length - 1);
-        l[i] = (L[idx] + (L[next] - L[idx]) * frac) * gain * gl;
-        r[i] = (R[idx] + (R[next] - R[idx]) * frac) * gain * gr;
+        l[i] = L[idx] + (L[next] - L[idx]) * frac;
+        r[i] = R[idx] + (R[next] - R[idx]) * frac;
       }
+    }
+  }
+
+  for (let block = i0; block < i1; block += BLOCK) {
+    const blockEnd = Math.min(i1, block + BLOCK);
+    // 音量・パン・フェードはブロック単位で評価する
+    const tl = t0 + block / sr;
+    const localFrame = secondsToFrames(tl - src.start, fps);
+    const vals = paramsAt(localFrame);
+    const volume = Number(vals.volume ?? 100) / 100;
+    const [gl, gr] = panGains(Number(vals.pan ?? 0));
+    const fade = fadeFactor(tl - src.start, objDuration, fadeIn, fadeOut);
+    const gain = volume * fade;
+    for (let i = block; i < blockEnd; i++) {
+      l[i] *= gain * gl;
+      r[i] *= gain * gr;
     }
   }
   return { l, r, i0, i1 };
@@ -266,7 +293,14 @@ export async function mixScene(
       duration = obj.assetId ? sources.assetDuration(obj.assetId) : undefined;
     }
     if (!reader) return;
-    const src: ObjectSource = { obj, reader, duration, start: objStart, end: objEnd };
+    const src: ObjectSource = {
+      obj,
+      reader,
+      duration,
+      start: objStart,
+      end: objEnd,
+      stretch: sources.stretchCache?.(key),
+    };
     const rendered = hasAudioEffects(obj)
       ? await renderWithEffects(
           src,

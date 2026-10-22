@@ -3,6 +3,7 @@ import type { MediaSourceHandle } from '../media/mediaSource';
 import { AudioEffectChain } from './effects';
 import type { MixSources } from './mixer';
 import { AudioTrackReader, type PcmReader } from './reader';
+import { StretchCache } from './timeStretch';
 
 const IDLE_MS = 10_000;
 
@@ -19,6 +20,8 @@ export class AudioReaderPool implements MixSources {
     string,
     { chain: AudioEffectChain; sampleRate: number; lastUsed: number }
   >();
+
+  private stretches = new Map<string, { cache: StretchCache; lastUsed: number }>();
 
   constructor(
     private getHandle: (assetId: string) => MediaSourceHandle | undefined,
@@ -57,6 +60,16 @@ export class AudioReaderPool implements MixSources {
     return entry.chain;
   }
 
+  stretchCache(instanceKey: string): StretchCache {
+    let entry = this.stretches.get(instanceKey);
+    if (!entry) {
+      entry = { cache: new StretchCache(), lastUsed: 0 };
+      this.stretches.set(instanceKey, entry);
+    }
+    entry.lastUsed = performance.now();
+    return entry.cache;
+  }
+
   assetDuration(assetId: string): number | undefined {
     return this.getDuration(assetId);
   }
@@ -70,11 +83,15 @@ export class AudioReaderPool implements MixSources {
       }
     }
     for (const [id, e] of this.chains) if (now - e.lastUsed > IDLE_MS) this.chains.delete(id);
+    for (const [id, e] of this.stretches) {
+      if (now - e.lastUsed > IDLE_MS) this.stretches.delete(id);
+    }
   }
 
   clear(): void {
     for (const e of this.readers.values()) e.reader.dispose();
     this.readers.clear();
     this.chains.clear();
+    this.stretches.clear();
   }
 }
