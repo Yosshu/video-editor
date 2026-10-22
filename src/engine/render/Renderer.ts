@@ -225,9 +225,13 @@ export class Renderer {
   private pixelScale = 1;
   private lost = false;
 
-  constructor(readonly canvas: HTMLCanvasElement | OffscreenCanvas) {
+  /** alpha を true にすると、背景を透明にして描ける（透過動画・連番画像の書き出し用） */
+  constructor(
+    readonly canvas: HTMLCanvasElement | OffscreenCanvas,
+    options: { alpha?: boolean } = {},
+  ) {
     const gl = canvas.getContext('webgl2', {
-      alpha: false,
+      alpha: options.alpha ?? false,
       antialias: false,
       premultipliedAlpha: true,
       preserveDrawingBuffer: true,
@@ -650,17 +654,18 @@ export class Renderer {
     }
   }
 
-  render(ops: RenderOp[], background: string): void {
+  /** background が null なら背景を透明にする */
+  render(ops: RenderOp[], background: string | null): void {
     if (this.isContextLost || !this.sceneTarget) return;
     const gl = this.gl;
-    const [r, g, b] = parseColor(background);
+    const [r, g, b] = background === null ? [0, 0, 0] : parseColor(background);
     this.renderInto(
       {
         target: this.sceneTarget,
         sceneW: this.sceneWidth,
         sceneH: this.sceneHeight,
         res: this.sceneTarget.width / this.sceneWidth,
-        background: [r, g, b, 1],
+        background: [r, g, b, background === null ? 0 : 1],
         copy: this.sceneCopy,
         mask: this.maskTarget,
         pooled: false,

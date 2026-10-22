@@ -23,9 +23,11 @@ export class OfflineRenderer {
     private scene: Scene,
     readonly width: number,
     readonly height: number,
+    /** 背景を透明にする */
+    private transparent = false,
   ) {
     this.canvas = new OffscreenCanvas(width, height);
-    this.renderer = new Renderer(this.canvas);
+    this.renderer = new Renderer(this.canvas, { alpha: transparent });
     this.renderer.setSize(scene.width, scene.height, width / scene.width, { width, height });
     const durations = new Map(project.assets.map((a) => [a.id, a.durationSec]));
     this.media = {
@@ -62,7 +64,7 @@ export class OfflineRenderer {
     this.requests = null;
     for (const r of requests) await this.frames.prepare(r.key, r.assetId, r.time);
     const composed = this.compositor.compose(project, scene, frame, this.media, scale);
-    this.renderer.render(composed.ops, project.settings.backgroundColor);
+    this.renderer.render(composed.ops, this.transparent ? null : project.settings.backgroundColor);
     this.renderer.pruneTextures(composed.textureKeys);
   }
 

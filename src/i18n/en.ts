@@ -875,4 +875,15 @@ export const EN: Record<string, string> = {
   回転の速さ: 'Spin speed',
   '°/秒': '°/s',
   パーティクルを追加: 'Add particles',
+  速度を変えても音程を保つ: 'Keep pitch when changing speed',
+  'GIF（アニメーション）': 'GIF (animated)',
+  '連番 PNG（ZIP）': 'PNG sequence (ZIP)',
+  'GIF 画像': 'GIF image',
+  'GIF を書き出しています': 'Exporting GIF',
+  '連番 PNG を書き出しています': 'Exporting PNG sequence',
+  コマの速さ: 'Frame rate',
+  背景: 'Background',
+  '透明にできるのは WebM（VP8・VP9）・GIF・連番 PNG です':
+    'Transparency is available for WebM (VP8/VP9), GIF, and PNG sequences',
+  透明にする: 'Transparent',
 };

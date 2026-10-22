@@ -32,6 +32,8 @@ export interface ExportOptions {
   /** 書き出す範囲（フレーム、終わりは含まない） */
   startFrame: number;
   endFrame: number;
+  /** 背景を透明にする（WebM の VP8・VP9 だけ） */
+  transparent?: boolean;
 }
 
 export interface ExportProgress {
@@ -99,12 +101,14 @@ export async function exportVideo(
       ),
   });
 
-  const renderer = new OfflineRenderer(project, scene, options.width, options.height);
+  const transparent = options.transparent === true;
+  const renderer = new OfflineRenderer(project, scene, options.width, options.height, transparent);
   const quality = new Quality(options.quality);
   const videoSource = new CanvasSource(renderer.canvas, {
     codec: options.videoCodec,
     quality,
     keyFrameInterval: 2,
+    alpha: transparent ? 'keep' : 'discard',
   });
   output.addVideoTrack(videoSource, { frameRate: rate });
 

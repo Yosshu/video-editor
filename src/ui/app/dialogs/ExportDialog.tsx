@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AudioCodec, QualityLevel, VideoCodec } from 'mediabunny';
-import { baseName, chooseSaveTarget, deliver } from '../../../app/exportActions';
+import { baseName, chooseSaveTarget, deliver, type SaveTarget } from '../../../app/exportActions';
 import { formatTimecode, fpsValue } from '../../../core/model/time';
 import { sceneDuration } from '../../../core/timeline/ops';
 import {
@@ -18,6 +18,7 @@ import {
   renderStill,
   type ExportProgress,
 } from '../../../engine/export/exporter';
+import { exportGif, exportPngSequence } from '../../../engine/export/sequences';
 import { exportWav } from '../../../engine/export/wav';
 import { playback } from '../../../engine/playback/Playback';
 import { currentScene, getState, notify, useEditor } from '../../../state/store';
@@ -34,6 +35,52 @@ const QUALITIES: { value: QualityLevel; label: string }[] = [
 ];
 
 const SCALES = [1, 0.75, 0.5, 0.25];
+
+/** 書き出す形式（動画のほか、GIF と連番 PNG） */
+type OutputFormat = ContainerFormat | 'gif' | 'png';
+
+const OUTPUT_FORMATS: { value: OutputFormat; label: string }[] = [
+  ...CONTAINERS.map((c) => ({ value: c.value, label: c.label })),
+  { value: 'gif', label: 'GIF（アニメーション）' },
+  { value: 'png', label: '連番 PNG（ZIP）' },
+];
+
+/** GIF のコマの速さの候補（GIF は 1/100 秒単位なので 50 まで） */
+const GIF_FPS = [10, 12, 15, 20, 25, 30, 50];
+
+/** 保存先へ順に書き込む口と、書き終えたときの処理 */
+function targetWriter(target: SaveTarget, mime: string) {
+  const parts: Uint8Array[] = [];
+  let position = 0;
+  return {
+    write:
+      target.kind === 'file'
+        ? async (data: Uint8Array) => {
+            await target.writable.write({
+              type: 'write',
+              position,
+              data: data as Uint8Array<ArrayBuffer>,
+            });
+            position += data.length;
+          }
+        : async (data: Uint8Array) => {
+            parts.push(data);
+          },
+    abort: async () => {
+      if (target.kind === 'file') await target.writable.abort().catch(() => undefined);
+    },
+    /** 完了の知らせの文を返す */
+    finish: async (): Promise<string> => {
+      if (target.kind === 'file') {
+        await target.writable.close();
+        return t('「{0}」に保存しました。', target.name);
+      }
+      const blob = new Blob(parts as BlobPart[], { type: mime });
+      deliver(blob, target.name);
+      return t('「{0}」（{1}）をダウンロードしました。', target.name, formatBytes(blob.size));
+    },
+  };
+}
 
 type Phase =
   | { kind: 'settings' }
@@ -53,7 +100,9 @@ export function ExportDialog() {
   );
   const duration = sceneDuration(scene);
   const [support, setSupport] = useState<CodecSupport | null>(null);
-  const [format, setFormat] = useState<ContainerFormat>('mp4');
+  const [format, setFormat] = useState<OutputFormat>('mp4');
+  const [transparent, setTransparent] = useState(false);
+  const [gifFps, setGifFps] = useState(() => Math.min(15, Math.round(fpsValue(settings.fps))));
   const [videoCodec, setVideoCodec] = useState<VideoCodec | ''>('');
   const [audioCodec, setAudioCodec] = useState<AudioCodec | ''>('');
   const [withAudio, setWithAudio] = useState(true);
@@ -76,7 +125,7 @@ export function ExportDialog() {
         setSupport(s);
         // 使える形式を初期値にする
         const preferred: ContainerFormat = s.video.mp4.length > 0 ? 'mp4' : 'webm';
-        setFormat((f) => (s.video[f].length > 0 ? f : preferred));
+        setFormat((f) => (f === 'gif' || f === 'png' || s.video[f].length > 0 ? f : preferred));
       },
     );
     return () => {
@@ -84,12 +133,15 @@ export function ExportDialog() {
     };
   }, [width, height, settings.fps, settings.sampleRate]);
 
-  const videoOptions = support
-    ? VIDEO_CODECS[format].filter((c) => support.video[format].includes(c.value))
-    : [];
-  const audioOptions = support
-    ? AUDIO_CODECS[format].filter((c) => support.audio[format].includes(c.value))
-    : [];
+  const container = format === 'mp4' || format === 'webm' ? format : null;
+  const videoOptions =
+    support && container
+      ? VIDEO_CODECS[container].filter((c) => support.video[container].includes(c.value))
+      : [];
+  const audioOptions =
+    support && container
+      ? AUDIO_CODECS[container].filter((c) => support.audio[container].includes(c.value))
+      : [];
   const vCodec = videoOptions.some((c) => c.value === videoCodec)
     ? (videoCodec as VideoCodec)
     : videoOptions[0]?.value;
@@ -99,6 +151,12 @@ export function ExportDialog() {
   const start = rangeMode === 'all' ? 0 : Math.max(0, Math.min(rangeStart, duration));
   const end = rangeMode === 'all' ? duration : Math.max(start, Math.min(rangeEnd, duration));
   const running = phase.kind === 'running';
+  // 透明にできるのは GIF・連番 PNG と、WebM の VP8・VP9
+  const canTransparent =
+    format === 'gif' ||
+    format === 'png' ||
+    (format === 'webm' && (vCodec === 'vp9' || vCodec === 'vp8'));
+  const useTransparent = canTransparent && transparent;
 
   const run = async (
     label: string,
@@ -136,13 +194,13 @@ export function ExportDialog() {
   };
 
   const startVideo = async () => {
-    if (!vCodec) return;
-    const container = CONTAINERS.find((c) => c.value === format)!;
+    if (!vCodec || !container) return;
+    const info = CONTAINERS.find((c) => c.value === container)!;
     const target = await chooseSaveTarget(
-      `${baseName()}${container.extension}`,
-      t('{0} 動画', container.label),
-      container.mime,
-      container.extension,
+      `${baseName()}${info.extension}`,
+      t('{0} 動画', info.label),
+      info.mime,
+      info.extension,
     );
     if (!target) return;
     const { project } = getState();
@@ -151,7 +209,7 @@ export function ExportDialog() {
         project,
         scene,
         {
-          format,
+          format: container,
           videoCodec: vCodec,
           audioCodec: withAudio && aCodec ? aCodec : null,
           width,
@@ -159,6 +217,7 @@ export function ExportDialog() {
           quality,
           startFrame: start,
           endFrame: end,
+          transparent: useTransparent,
         },
         target.kind === 'file' ? { kind: 'file', writable: target.writable } : { kind: 'memory' },
         onProgress,
@@ -177,36 +236,85 @@ export function ExportDialog() {
     if (!target) return;
     const { project } = getState();
     await run(t('音声を書き出しています'), async (signal, onProgress) => {
-      const parts: Uint8Array[] = [];
-      let position = 0;
-      const write =
-        target.kind === 'file'
-          ? async (data: Uint8Array) => {
-              await target.writable.write({
-                type: 'write',
-                position,
-                data: data as Uint8Array<ArrayBuffer>,
-              });
-              position += data.length;
-            }
-          : async (data: Uint8Array) => {
-              parts.push(data);
-            };
+      const out = targetWriter(target, 'audio/wav');
       try {
-        await exportWav(project, scene, start, end, write, onProgress, signal);
+        await exportWav(project, scene, start, end, out.write, onProgress, signal);
       } catch (e) {
-        if (target.kind === 'file') await target.writable.abort().catch(() => undefined);
+        await out.abort();
         throw e;
       }
-      if (target.kind === 'file') {
-        await target.writable.close();
-        return t('「{0}」に保存しました。', target.name);
-      }
-      const blob = new Blob(parts as BlobPart[], { type: 'audio/wav' });
-      deliver(blob, target.name);
-      return t('「{0}」（{1}）をダウンロードしました。', target.name, formatBytes(blob.size));
+      return out.finish();
     });
   };
+
+  const startGif = async () => {
+    const target = await chooseSaveTarget(`${baseName()}.gif`, t('GIF 画像'), 'image/gif', '.gif');
+    if (!target) return;
+    const { project } = getState();
+    await run(t('GIF を書き出しています'), async (signal, onProgress) => {
+      const out = targetWriter(target, 'image/gif');
+      try {
+        await exportGif(
+          project,
+          scene,
+          {
+            width,
+            height,
+            startFrame: start,
+            endFrame: end,
+            transparent: useTransparent,
+            fps: gifFps,
+          },
+          out.write,
+          onProgress,
+          signal,
+        );
+      } catch (e) {
+        await out.abort();
+        throw e;
+      }
+      return out.finish();
+    });
+  };
+
+  const startPng = async () => {
+    const base = baseName();
+    const target = await chooseSaveTarget(
+      `${base}_png.zip`,
+      t('連番 PNG（ZIP）'),
+      'application/zip',
+      '.zip',
+    );
+    if (!target) return;
+    const { project } = getState();
+    await run(t('連番 PNG を書き出しています'), async (signal, onProgress) => {
+      const out = targetWriter(target, 'application/zip');
+      try {
+        await exportPngSequence(
+          project,
+          scene,
+          {
+            width,
+            height,
+            startFrame: start,
+            endFrame: end,
+            transparent: useTransparent,
+            baseName: base,
+          },
+          out,
+          onProgress,
+          signal,
+        );
+      } catch (e) {
+        await out.abort();
+        throw e;
+      }
+      return out.finish();
+    });
+  };
+
+  const startExport = () =>
+    void (format === 'gif' ? startGif() : format === 'png' ? startPng() : startVideo());
 
   const saveStill = async () => {
     const state = getState();
@@ -269,8 +377,8 @@ export function ExportDialog() {
             <button
               type="button"
               className="primary"
-              disabled={!vCodec || end <= start}
-              onClick={() => void startVideo()}
+              disabled={(container !== null && !vCodec) || end <= start}
+              onClick={startExport}
             >
               {t('書き出し開始')}
             </button>
@@ -292,59 +400,101 @@ export function ExportDialog() {
           <select
             id="ex-format"
             value={format}
-            onChange={(e) => setFormat(e.target.value as ContainerFormat)}
+            onChange={(e) => setFormat(e.target.value as OutputFormat)}
           >
-            {CONTAINERS.map((c) => (
+            {OUTPUT_FORMATS.map((c) => (
               <option
                 key={c.value}
                 value={c.value}
-                disabled={!!support && support.video[c.value].length === 0}
+                disabled={
+                  !!support &&
+                  (c.value === 'mp4' || c.value === 'webm') &&
+                  support.video[c.value].length === 0
+                }
               >
                 {t(c.label)}
               </option>
             ))}
           </select>
-          <label htmlFor="ex-vcodec">{t('映像')}</label>
-          <select
-            id="ex-vcodec"
-            value={vCodec ?? ''}
-            onChange={(e) => setVideoCodec(e.target.value as VideoCodec)}
-            disabled={!support}
+          {container && (
+            <>
+              <label htmlFor="ex-vcodec">{t('映像')}</label>
+              <select
+                id="ex-vcodec"
+                value={vCodec ?? ''}
+                onChange={(e) => setVideoCodec(e.target.value as VideoCodec)}
+                disabled={!support}
+              >
+                {!support && <option>{t('確認中…')}</option>}
+                {support && videoOptions.length === 0 && (
+                  <option value="">{t('この環境では使えません')}</option>
+                )}
+                {videoOptions.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {t(c.label)}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="ex-acodec">{t('音声')}</label>
+              <div className="inline">
+                <input
+                  type="checkbox"
+                  aria-label={t('音声を含める')}
+                  checked={withAudio}
+                  onChange={(e) => setWithAudio(e.target.checked)}
+                />
+                <select
+                  id="ex-acodec"
+                  value={aCodec ?? ''}
+                  onChange={(e) => setAudioCodec(e.target.value as AudioCodec)}
+                  disabled={!withAudio || !support}
+                >
+                  {support && audioOptions.length === 0 && (
+                    <option value="">{t('この環境では使えません')}</option>
+                  )}
+                  {audioOptions.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {t(c.label)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+          {format === 'gif' && (
+            <>
+              <label htmlFor="ex-gif-fps">{t('コマの速さ')}</label>
+              <select
+                id="ex-gif-fps"
+                value={gifFps}
+                onChange={(e) => setGifFps(Number(e.target.value))}
+              >
+                {GIF_FPS.map((f) => (
+                  <option key={f} value={f}>
+                    {f} fps
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          <label htmlFor="ex-transparent">{t('背景')}</label>
+          <label
+            className="inline"
+            title={
+              canTransparent
+                ? undefined
+                : t('透明にできるのは WebM（VP8・VP9）・GIF・連番 PNG です')
+            }
           >
-            {!support && <option>{t('確認中…')}</option>}
-            {support && videoOptions.length === 0 && (
-              <option value="">{t('この環境では使えません')}</option>
-            )}
-            {videoOptions.map((c) => (
-              <option key={c.value} value={c.value}>
-                {t(c.label)}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="ex-acodec">{t('音声')}</label>
-          <div className="inline">
             <input
+              id="ex-transparent"
               type="checkbox"
-              aria-label={t('音声を含める')}
-              checked={withAudio}
-              onChange={(e) => setWithAudio(e.target.checked)}
+              checked={useTransparent}
+              disabled={!canTransparent}
+              onChange={(e) => setTransparent(e.target.checked)}
             />
-            <select
-              id="ex-acodec"
-              value={aCodec ?? ''}
-              onChange={(e) => setAudioCodec(e.target.value as AudioCodec)}
-              disabled={!withAudio || !support}
-            >
-              {support && audioOptions.length === 0 && (
-                <option value="">{t('この環境では使えません')}</option>
-              )}
-              {audioOptions.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {t(c.label)}
-                </option>
-              ))}
-            </select>
-          </div>
+            {t('透明にする')}
+          </label>
           <label htmlFor="ex-size">{t('解像度')}</label>
           <select id="ex-size" value={scale} onChange={(e) => setScale(Number(e.target.value))}>
             {SCALES.map((s) => (
@@ -354,18 +504,22 @@ export function ExportDialog() {
               </option>
             ))}
           </select>
-          <label htmlFor="ex-quality">{t('画質')}</label>
-          <select
-            id="ex-quality"
-            value={quality}
-            onChange={(e) => setQuality(e.target.value as QualityLevel)}
-          >
-            {QUALITIES.map((q) => (
-              <option key={q.value} value={q.value}>
-                {t(q.label)}
-              </option>
-            ))}
-          </select>
+          {container && (
+            <>
+              <label htmlFor="ex-quality">{t('画質')}</label>
+              <select
+                id="ex-quality"
+                value={quality}
+                onChange={(e) => setQuality(e.target.value as QualityLevel)}
+              >
+                {QUALITIES.map((q) => (
+                  <option key={q.value} value={q.value}>
+                    {t(q.label)}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <span>{t('範囲')}</span>
           <div className="range-options">
             <label>
