@@ -886,4 +886,7 @@ export const EN: Record<string, string> = {
   '透明にできるのは WebM（VP8・VP9）・GIF・連番 PNG です':
     'Transparency is available for WebM (VP8/VP9), GIF, and PNG sequences',
   透明にする: 'Transparent',
+  '再生中は描画が間に合うよう解像度を下げます（今：{0}）':
+    'Lowers the resolution during playback so drawing keeps up (now: {0})',
+  自動: 'Auto',
 };

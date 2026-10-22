@@ -6,6 +6,7 @@ import { currentScene, useEditor, type PreviewQuality } from '../../state/store'
 import { useUi } from '../../state/ui';
 import { togglePreviewFullscreen } from './fullscreen';
 import { LevelMeter } from './LevelMeter';
+import { usePreviewStats } from '../../engine/preview/PreviewEngine';
 import { t } from '../../i18n';
 
 interface Props {
@@ -13,8 +14,13 @@ interface Props {
   onQuality: (q: PreviewQuality) => void;
 }
 
+function formatScale(scale: number): string {
+  return scale === 1 ? t('等倍') : `1/${Math.round(1 / scale)}`;
+}
+
 export function TransportBar({ quality, onQuality }: Props) {
   const playing = useEditor((s) => s.playing);
+  const autoScale = usePreviewStats((s) => s.scale);
   const guides = useUi((s) => s.previewGuides);
   const timecode = useEditor((s) => formatTimecode(s.playhead, s.project.settings.fps));
   const total = useEditor((s) =>
@@ -103,8 +109,18 @@ export function TransportBar({ quality, onQuality }: Props) {
         {t('画質')}
         <select
           value={quality}
-          onChange={(e) => onQuality(Number(e.target.value) as PreviewQuality)}
+          onChange={(e) =>
+            onQuality(
+              e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as PreviewQuality),
+            )
+          }
+          title={
+            quality === 'auto'
+              ? t('再生中は描画が間に合うよう解像度を下げます（今：{0}）', formatScale(autoScale))
+              : undefined
+          }
         >
+          <option value="auto">{t('自動')}</option>
           <option value={1}>{t('等倍')}</option>
           <option value={0.5}>1/2</option>
           <option value={0.25}>1/4</option>

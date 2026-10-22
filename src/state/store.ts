@@ -23,7 +23,8 @@ export interface Notice {
   message: string;
 }
 
-export type PreviewQuality = 1 | 0.5 | 0.25;
+/** プレビューの解像度の倍率。auto は再生中の描画の速さに合わせて自動で決める */
+export type PreviewQuality = 'auto' | 1 | 0.5 | 0.25;
 
 export interface EditorState {
   project: Project;
@@ -58,7 +59,7 @@ function initialState(project: Project = createProject()): EditorState {
     future: [],
     dirty: false,
     fileName: null,
-    previewQuality: 0.5,
+    previewQuality: 'auto',
     pxPerFrame: 4,
     assetStatus: {},
     notices: [],

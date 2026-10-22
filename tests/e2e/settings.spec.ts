@@ -34,8 +34,10 @@ test('オブジェクトとエフェクトのプリセットを保存して使�
   await expect(timelineObjects(page)).toHaveCount(3);
   await expect(page.getByLabel('X', { exact: true })).toHaveValue('250');
 
-  // ページを開き直しても残っている
+  // ページを開き直しても残っている（自動保存を待ってから開き直し、復元はしない）
+  await page.waitForTimeout(2500);
   await page.reload();
+  await page.getByRole('button', { name: '復元しない' }).click();
   await page.getByRole('button', { name: 'プリセット', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('右の図形');
   await expect(page.getByRole('dialog')).toContainText('強いぼかし');
