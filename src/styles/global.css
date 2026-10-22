@@ -1449,3 +1449,25 @@ kbd {
 .special-ease input[type='number'] {
   width: 64px;
 }
+
+/* 時間のかかる処理の表示 */
+.busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.busy-box {
+  min-width: 280px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+}
+
+.busy-box progress {
+  width: 100%;
+}

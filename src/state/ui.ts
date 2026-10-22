@@ -22,6 +22,8 @@ export interface ContextMenuItem {
 
 export interface UiState {
   dialog: DialogState;
+  /** 時間のかかる処理の表示（素材同梱パッケージの保存など） */
+  busy: { label: string; progress?: number } | null;
   contextMenu: { x: number; y: number; items: (ContextMenuItem | 'separator')[] } | null;
   /** タイムラインの吸着 */
   snap: boolean;
@@ -31,6 +33,7 @@ export interface UiState {
 
 export const useUi = create<UiState>(() => ({
   dialog: null,
+  busy: null,
   contextMenu: null,
   snap: true,
   previewGuides: { grid: false, safeArea: false },

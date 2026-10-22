@@ -1,4 +1,4 @@
-import { pickAndOpenProject, saveProject } from '../../app/projectFile';
+import { pickAndOpenProject, savePackage, saveProject } from '../../app/projectFile';
 import { redo, undo, useEditor } from '../../state/store';
 import { openDialog } from '../../state/ui';
 
@@ -29,6 +29,13 @@ export function MenuBar() {
           title="Ctrl+Shift+S"
         >
           名前を付けて保存
+        </button>
+        <button
+          type="button"
+          onClick={() => void savePackage()}
+          title="素材ファイルも 1 つにまとめて保存します（.vedpack）。別の PC へ持っていくとき用"
+        >
+          素材ごと保存
         </button>
         <span className="menu-sep" />
         <button

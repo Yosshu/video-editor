@@ -27,6 +27,25 @@ export function collectDroppedFiles(dataTransfer: DataTransfer): Promise<Incomin
   return Promise.all(pending).then((list) => list.filter((x): x is IncomingFile => x !== null));
 }
 
+/** 素材同梱パッケージの中の素材の場所（パッケージのファイルハンドルと、中のデータの範囲） */
+interface PackageSlice {
+  handle: FileSystemFileHandle;
+  start: number;
+  size: number;
+}
+
+/** パッケージから読み込んだ素材を、次回もパッケージから復元できるように覚えておく */
+export async function rememberPackageSlice(
+  fingerprint: string,
+  slice: PackageSlice,
+): Promise<void> {
+  try {
+    await idbSet('handles', `pack:${fingerprint}`, slice);
+  } catch {
+    // 保存できない環境では何もしない
+  }
+}
+
 async function rememberHandle(
   fingerprint: string,
   handle: FileSystemFileHandle | undefined,
@@ -90,6 +109,21 @@ export async function restoreAssets(project: Project): Promise<Asset[]> {
         if (handle && (await handle.queryPermission?.({ mode: 'read' })) === 'granted') {
           const file = await handle.getFile();
           if (file.size === asset.size) {
+            await assetRegistry.attach(asset, file);
+            setAssetStatus(asset.id, 'ready');
+            return;
+          }
+        }
+        // 素材同梱パッケージから読み込んだ素材は、パッケージの中から取り出す
+        const pack = await idbGet<PackageSlice>('handles', `pack:${asset.fingerprint}`);
+        if (pack && (await pack.handle.queryPermission?.({ mode: 'read' })) === 'granted') {
+          const whole = await pack.handle.getFile();
+          if (pack.size === asset.size && whole.size >= pack.start + pack.size) {
+            const blob = whole.slice(pack.start, pack.start + pack.size, asset.mimeType);
+            const file = new File([blob], asset.name, {
+              type: asset.mimeType,
+              lastModified: asset.lastModified,
+            });
             await assetRegistry.attach(asset, file);
             setAssetStatus(asset.id, 'ready');
             return;

@@ -4,6 +4,9 @@ import type { ObjectType, Project, ProjectSettings, Scene, TimelineObject } from
 export const FORMAT_ID = 'vedproj';
 export const FORMAT_VERSION = 1;
 export const PROJECT_EXTENSION = '.vedproj';
+/** 素材同梱パッケージ（ZIP）の拡張子と、先頭の mimetype に書く値 */
+export const PACKAGE_EXTENSION = '.vedpack';
+export const PACKAGE_MIMETYPE = 'application/x-vedpack';
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
   width: 1920,

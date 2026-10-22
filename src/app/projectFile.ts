@@ -1,13 +1,26 @@
-import { createProject, PROJECT_EXTENSION } from '../core/project/factory';
+import {
+  createProject,
+  PACKAGE_EXTENSION,
+  PACKAGE_MIMETYPE,
+  PROJECT_EXTENSION,
+} from '../core/project/factory';
 import { parseProject, ProjectFileError, serializeProject } from '../core/project/serialize';
 import type { Project, ProjectSettings } from '../core/model/types';
+import { extensionOf, isPackageFileName } from '../engine/media/detect';
 import { assetRegistry } from '../engine/media/registry';
 import { downloadBlob, isAbortError } from '../storage/download';
 import { pickFilesWithInput } from '../storage/filePicker';
 import { idbDelete, idbGet, idbSet } from '../storage/idb';
-import { getState, notify, replaceProject, useEditor } from '../state/store';
-import { openDialog } from '../state/ui';
-import { restoreAssets } from './assets';
+import {
+  readZipEntries,
+  ZipFormatError,
+  ZipWriter,
+  zipEntryBlob,
+  type ZipSink,
+} from '../storage/zip';
+import { getState, notify, replaceProject, setAssetStatus, useEditor } from '../state/store';
+import { openDialog, useUi } from '../state/ui';
+import { missingAssets, rememberPackageSlice, restoreAssets } from './assets';
 
 const AUTOSAVE_KEY = 'autosave';
 const PROJECT_HANDLE_KEY = 'projectHandle';
@@ -18,6 +31,13 @@ let currentHandle: FileSystemFileHandle | null = null;
 
 const FILE_TYPES: FilePickerAcceptType[] = [
   { description: '編集ファイル', accept: { 'application/json': [PROJECT_EXTENSION] } },
+];
+
+const OPEN_TYPES: FilePickerAcceptType[] = [
+  {
+    description: '編集ファイル・素材同梱パッケージ',
+    accept: { 'application/json': [PROJECT_EXTENSION], 'application/zip': [PACKAGE_EXTENSION] },
+  },
 ];
 
 function suggestedName(): string {
@@ -77,8 +97,12 @@ async function loadProject(
   if (missing.length > 0) openDialog({ type: 'missingAssets' });
 }
 
-/** 編集ファイルを開く */
+/** 編集ファイル（または素材同梱パッケージ）を開く */
 export async function openProjectFile(file: File, handle?: FileSystemFileHandle): Promise<void> {
+  if (isPackageFileName(file.name)) {
+    await openPackageFile(file, handle);
+    return;
+  }
   try {
     const { project, warnings } = parseProject(await file.text());
     currentHandle = handle ?? null;
@@ -95,14 +119,16 @@ export async function openProjectFile(file: File, handle?: FileSystemFileHandle)
 export async function pickAndOpenProject(): Promise<void> {
   if (window.showOpenFilePicker) {
     try {
-      const [handle] = await window.showOpenFilePicker({ types: FILE_TYPES, id: 'project' });
+      const [handle] = await window.showOpenFilePicker({ types: OPEN_TYPES, id: 'project' });
       await openProjectFile(await handle.getFile(), handle);
     } catch (e) {
       if (!isAbortError(e)) notify('編集ファイルを開けませんでした。', 'error');
     }
     return;
   }
-  const [file] = await pickFilesWithInput({ accept: `${PROJECT_EXTENSION},application/json` });
+  const [file] = await pickFilesWithInput({
+    accept: `${PROJECT_EXTENSION},${PACKAGE_EXTENSION},application/json`,
+  });
   if (file) await openProjectFile(file);
 }
 
@@ -175,4 +201,152 @@ export async function restoreAutosave(): Promise<void> {
 
 export async function discardAutosave(): Promise<void> {
   await idbDelete('kv', AUTOSAVE_KEY).catch(() => undefined);
+}
+
+/** パッケージの中の素材のファイル名（拡張子は元のファイルに合わせる） */
+function packagedMediaName(assetId: string, fileName: string): string {
+  const ext = extensionOf(fileName);
+  return `media/${assetId}${ext ? `.${ext}` : ''}`;
+}
+
+/**
+ * 素材ごと 1 つのファイル（.vedpack、中身は無圧縮の ZIP）に保存する。
+ * 別の PC やブラウザへ持っていくとき用。素材は書き込みながら読むので、大きな素材もメモリにためない。
+ */
+export async function savePackage(): Promise<boolean> {
+  const { project } = getState();
+  const missing = missingAssets().filter((a) => !assetRegistry.getFile(a.id));
+  const unloaded = project.assets.filter((a) => !assetRegistry.getFile(a.id));
+  if (missing.length > 0 || unloaded.length > 0) {
+    notify(
+      `見つからない素材があるため、素材ごと保存できません（${[...missing, ...unloaded][0].name} など）。先に素材を指定し直してください。`,
+      'error',
+    );
+    return false;
+  }
+  const base = (getState().fileName ?? 'project').replace(/\.(vedproj|vedpack)$/, '');
+  let sink: ZipSink;
+  let finish: () => Promise<void>;
+  try {
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `${base}${PACKAGE_EXTENSION}`,
+        types: [
+          { description: '素材同梱パッケージ', accept: { 'application/zip': [PACKAGE_EXTENSION] } },
+        ],
+        id: 'package',
+      });
+      const writable = await handle.createWritable();
+      sink = { write: (d) => writable.write(d as BufferSource) };
+      finish = () => writable.close();
+    } else {
+      const chunks: Uint8Array[] = [];
+      sink = {
+        write: async (d) => {
+          chunks.push(d);
+        },
+      };
+      finish = async () =>
+        downloadBlob(
+          new Blob(chunks as BlobPart[], { type: 'application/zip' }),
+          `${base}${PACKAGE_EXTENSION}`,
+        );
+    }
+  } catch (e) {
+    if (!isAbortError(e)) notify('保存できませんでした。', 'error');
+    return false;
+  }
+
+  const total = project.assets.reduce(
+    (sum, a) => sum + (assetRegistry.getFile(a.id)?.size ?? 0),
+    0,
+  );
+  let done = 0;
+  useUi.setState({ busy: { label: '素材ごと保存しています…', progress: 0 } });
+  try {
+    const zip = new ZipWriter(sink);
+    const encoder = new TextEncoder();
+    // 先頭に無圧縮の mimetype を置き、ファイルの種類を判別しやすくする
+    await zip.add('mimetype', encoder.encode(PACKAGE_MIMETYPE));
+    await zip.add('project.vedproj', encoder.encode(serializeProject(project)));
+    for (const asset of project.assets) {
+      const file = assetRegistry.getFile(asset.id)!;
+      const before = done;
+      await zip.add(packagedMediaName(asset.id, file.name), file, {
+        mtime: new Date(file.lastModified || Date.now()),
+        onProgress: (written) => {
+          done = before + written;
+          useUi.setState({
+            busy: { label: '素材ごと保存しています…', progress: done / Math.max(1, total) },
+          });
+        },
+      });
+      done = before + file.size;
+    }
+    await zip.finish();
+    await finish();
+    notify('素材ごと保存しました。');
+    return true;
+  } catch (e) {
+    console.error(e);
+    notify('素材ごと保存できませんでした。', 'error');
+    return false;
+  } finally {
+    useUi.setState({ busy: null });
+  }
+}
+
+/** 素材同梱パッケージを開く。素材はパッケージのファイルの一部としてそのまま使う（コピーしない） */
+export async function openPackageFile(file: File, handle?: FileSystemFileHandle): Promise<void> {
+  try {
+    const entries = await readZipEntries(file);
+    const projectEntry = entries.find((e) => e.name === 'project.vedproj');
+    if (!projectEntry)
+      throw new ProjectFileError('素材同梱パッケージの中に編集ファイルがありません。');
+    const { project, warnings } = parseProject(
+      await (await zipEntryBlob(file, projectEntry)).text(),
+    );
+    currentHandle = null;
+    assetRegistry.clear();
+    replaceProject(project, file.name.replace(/\.vedpack$/i, PROJECT_EXTENSION));
+    for (const w of warnings) notify(w);
+    for (const asset of project.assets) {
+      const entry = entries.find(
+        (e) => e.name === `media/${asset.id}` || e.name.startsWith(`media/${asset.id}.`),
+      );
+      if (!entry) continue;
+      setAssetStatus(asset.id, 'loading');
+      try {
+        const blob = await zipEntryBlob(file, entry);
+        await assetRegistry.attach(
+          asset,
+          new File([blob], asset.name, { type: asset.mimeType, lastModified: asset.lastModified }),
+        );
+        setAssetStatus(asset.id, 'ready');
+        // 次回ページを開いたときも、同じパッケージから復元できるようにする
+        if (handle && entry.method === 0)
+          await rememberPackageSlice(asset.fingerprint, {
+            handle,
+            start: entry.dataOffset,
+            size: entry.size,
+          });
+      } catch (e) {
+        console.error(e);
+        setAssetStatus(asset.id, 'error');
+      }
+    }
+    // パッケージに入っていなかった素材は、いつもの方法で探す
+    const missing = await restoreAssets(getState().project);
+    if (missing.length > 0) openDialog({ type: 'missingAssets' });
+    // 保存すると編集ファイル（.vedproj）になるので、変更ありとして扱う
+    useEditor.setState({ dirty: true });
+    notify(`「${file.name}」を開きました。`);
+  } catch (e) {
+    const message =
+      e instanceof ProjectFileError || e instanceof ZipFormatError
+        ? e.message
+        : '素材同梱パッケージを開けませんでした。';
+    notify(message, 'error');
+    console.error(e);
+  }
 }

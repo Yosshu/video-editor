@@ -25,8 +25,14 @@ export function detectAssetKind(file: { name: string; type: string }): AssetKind
   return null;
 }
 
+/** 編集ファイル（.vedproj）または素材同梱パッケージ（.vedpack） */
 export function isProjectFileName(name: string): boolean {
-  return extensionOf(name) === 'vedproj';
+  const ext = extensionOf(name);
+  return ext === 'vedproj' || ext === 'vedpack';
+}
+
+export function isPackageFileName(name: string): boolean {
+  return extensionOf(name) === 'vedpack';
 }
 
 export const MEDIA_ACCEPT = [...VIDEO_EXT, ...AUDIO_EXT, ...IMAGE_EXT]

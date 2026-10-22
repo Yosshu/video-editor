@@ -11,6 +11,7 @@ import { Timeline } from '../timeline/Timeline';
 import { ContextMenu } from './ContextMenu';
 import { DialogHost } from './DialogHost';
 import { MenuBar } from './MenuBar';
+import { BusyOverlay } from './BusyOverlay';
 import { Notices } from './Notices';
 import { handleShortcut } from './shortcuts';
 import { Splitter } from './Splitter';
@@ -92,6 +93,7 @@ export function Editor() {
       <ContextMenu />
       <DialogHost />
       <Notices />
+      <BusyOverlay />
     </div>
   );
 }
