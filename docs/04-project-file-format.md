@@ -98,7 +98,13 @@
     // 既定値から変更のあるレイヤーだけ記録
     { "index": 1, "name": "背景" },
     { "index": 3, "name": "字幕", "locked": true },
+    // 下の 2 レイヤー（7・8）とまとめて、タイムラインで折りたたむ
+    { "index": 6, "name": "効果", "fold": 2, "collapsed": true },
   ],
+  // マーカー（省略可）
+  "markers": [{ "id": "mk_01", "frame": 90, "label": "サビ", "color": "#f5b544" }],
+  // BPM グリッド（省略可）。offset は 1 拍目のフレーム
+  "beatGrid": { "bpm": 128, "offset": 12, "beatsPerBar": 4, "visible": true },
   "objects": [
     {
       "id": "ob_01",
@@ -150,9 +156,11 @@
 ```
 
 - `type` の種類
-  - メディア：`video` `image` `audio` `text` `shape` `solid`、`scene`（別のシーンを素材にする。`params.sceneRef` にシーン ID）、`framebuffer`（それまでに描いた画面を素材にする）
+  - メディア：`video` `image` `audio` `text` `shape` `solid`、`scene`（別のシーンを素材にする。`params.sceneRef` にシーン ID）、`framebuffer`（それまでに描いた画面を素材にする）、`audioWave`（`params.targetLayer` のレイヤーにある音声・動画の音の大きさを表示する）
   - 制御：`filter`（上のレイヤー全体にエフェクト）、`partialFilter`（範囲の中だけエフェクト）、`group`（グループ制御）、`timeControl`（時間制御）、`camera`（カメラ制御）。制御オブジェクトの `range` は作用する下のレイヤー数（0 で下のすべて）
-- `effects` はオブジェクトに上から順に適用するエフェクト。`type` の種類：`colorAdjust`（色調補正）`monochrome`（単色化）`blur`（ぼかし）`edgeBlur`（境界ぼかし）`mosaic`（モザイク）`sharpen`（シャープ）`glow`（発光）`outline`（縁取り）`dropShadow`（ドロップシャドウ）`crop`（クリッピング）`mask`（図形マスク）`chromaKey` `colorKey` `lumaKey`（キー抜き）。エフェクトのパラメータもキーフレームで変化させられる（形式はオブジェクトのパラメータと同じ）。知らない種類のエフェクトは描画せずにそのまま残す。
+- `effects` はオブジェクトに上から順に適用するエフェクト。エフェクトのパラメータもキーフレームで変化させられる（形式はオブジェクトのパラメータと同じ）。知らない種類のエフェクトは描画せずにそのまま残す。`type` の種類：
+  - 映像：`colorAdjust`（色調補正）`monochrome`（単色化）`blur`（ぼかし）`edgeBlur`（境界ぼかし）`mosaic`（モザイク）`sharpen`（シャープ）`glow`（発光）`outline`（縁取り）`dropShadow`（ドロップシャドウ）`crop`（クリッピング）`mask`（図形マスク）`chromaKey` `colorKey` `lumaKey`（キー抜き）、`mirror`（ミラー）`vibrate`（振動）`wave`（波打ち）`polar`（極座標変換）`displace`（ゆがみ：膨らみ・へこみ・渦巻き）`tile`（画像ループ）`light`（ライト）`directionalBlur`（方向ブラー）`radialBlur`（放射ブラー）`noise`（ノイズ）`chromaticShift`（色ずれ）`diagonalClip`（斜めクリッピング）
+  - 音声：`equalizer`（イコライザー）`compressor`（コンプレッサー）`delay`（ディレイ・エコー）`reverb`（リバーブ）。音声・動画・シーンオブジェクトにかけられる
 - パラメータはオブジェクトの種類ごとに定義されている（`src/core/objects/definitions.ts`）。省略したパラメータは既定値とみなす（ファイルを小さく保ち、既定値の変更にも追従しやすくする）。
 - 主なパラメータ
   - 配置：`x` `y`（px、画面中央が原点）、`scale`（%）、`rotation`（度）、`opacity`（%）、`flipH` `flipV`、`blend`（合成モード）、`clipUpper`（上のオブジェクトでクリッピング）
@@ -174,13 +182,17 @@
     - `hold`（瞬間切り替え）、`linear`（直線）
     - `easeIn*` / `easeOut*` / `easeInOut*` のプリセット
     - `{ "bezier": [x1, y1, x2, y2] }`（自由なイージング曲線）
-    - 将来：`random`・`repeat` などの特殊な変化を追加
+    - `{ "special": "random" | "repeat" | "shake", "period": 4, "amount": 10, "smooth": false, "seed": 12345 }`（特殊な変化）
+      - `random`：`period` フレームごとに、その点と次の点の値の間のランダムな値になる
+      - `repeat`：`period` フレームを 1 周期として、2 つの値を往復する
+      - `shake`：2 つの値を直線で変化しながら、`period` フレームごとに ±`amount` の範囲で揺れる
+      - `smooth` で間をなめらかにつなぐ。`seed` は乱数の種（同じ値なら同じ動き。開き直しても変わらない）
 - オブジェクト全体を区切る「中間点」は、すべてのパラメータの同じ時刻にキーを打つ操作として UI で提供する（データ上はパラメータごとのキーに統一）。
 
 ### 4.5 時間の表し方
 
 - 時間はすべて **整数のフレーム番号**。フレームレートは `settings.fps` に有理数で持つ（29.97fps などの誤差を出さないため）。
-- フレームレートを後から変更した場合は、すべての時間を換算して丸める。
+- フレームレートを後から変更した場合は、すべての時間（オブジェクトの開始・終了、キーフレームの時刻、特殊な変化の周期、マーカー、BPM グリッドの 1 拍目）を換算して丸める。換算は単調なので、同じレイヤーのオブジェクトが重なることはない。
 - 素材内の時刻（`offset`）は素材側のフレームレートが異なりうるため秒（小数）で持つ。
 
 ## 5. バージョン管理と移行
