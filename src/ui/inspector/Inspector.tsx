@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { setObjectTiming } from '../../app/actions';
 import {
   addMidpointAtPlayhead,
@@ -18,7 +19,7 @@ import {
 import { usePresets } from '../../state/presets';
 import { referableScenes } from '../../app/sceneActions';
 import { EASE_OPTIONS, isSpecialEase } from '../../core/animation/ease';
-import { isAnimated, valueAt } from '../../core/animation/interpolate';
+import { isAnimated, isExpression } from '../../core/animation/interpolate';
 import { easeAt, hasKeyAt, objectKeyTimes } from '../../core/animation/keys';
 import {
   EFFECT_CATEGORIES,
@@ -26,7 +27,9 @@ import {
   effectDomain,
   getEffectDef,
 } from '../../core/effects/definitions';
-import { resolveParams } from '../../core/evaluate/evaluate';
+import { EXPR_VARIABLES, resolveEffectParams, resolveParams } from '../../core/evaluate/evaluate';
+import { exprError } from '../../core/expr/expr';
+import { setCustomShadersAllowed, useCustomShaders } from '../../engine/effects/customShader';
 import { formatTimecode, fpsValue } from '../../core/model/time';
 import type {
   Ease,
@@ -228,21 +231,114 @@ function EaseRow({ target, def }: { target: Target; def: NumberParamDef }) {
   );
 }
 
+/** 式で計算するパラメータの入力欄 */
+function ExpressionField({
+  def,
+  target,
+  computed,
+  disabled,
+  variables,
+}: {
+  def: NumberParamDef;
+  target: Target;
+  computed: number;
+  disabled: boolean;
+  variables: string[];
+}) {
+  const id = useId();
+  const raw = target.params[def.id];
+  const expr = isExpression(raw) ? raw.expr : '';
+  const error = exprError(expr, [...EXPR_VARIABLES, ...variables]);
+  return (
+    <div className="field expression-field">
+      <div className="field-label-row">
+        <label htmlFor={id} className="field-label">
+          {t(def.label)}
+        </label>
+        {!disabled && (
+          <button
+            type="button"
+            className="key-button expr-toggle on"
+            title={t('式をやめて数値にする')}
+            aria-label={t('{0}の式をやめる', t(def.label))}
+            onClick={() =>
+              setParamAtPlayhead(
+                target.obj.id,
+                def.id,
+                Math.round(computed * 1000) / 1000,
+                target.effectId,
+              )
+            }
+          >
+            ƒx
+          </button>
+        )}
+      </div>
+      <input
+        id={id}
+        type="text"
+        className="expr-input"
+        spellCheck={false}
+        value={expr}
+        disabled={disabled}
+        aria-label={t('{0}の式', t(def.label))}
+        onChange={(e) =>
+          setParamAtPlayhead(target.obj.id, def.id, { expr: e.target.value }, target.effectId)
+        }
+      />
+      <div className="expr-info">
+        {error ? (
+          <span className="error-text">{error}</span>
+        ) : (
+          <span className="dim">= {Math.round(computed * 1000) / 1000}</span>
+        )}
+      </div>
+      <details className="expr-help">
+        <summary>{t('式の書き方')}</summary>
+        <p>
+          {t(
+            '使える値：time（秒）、frame、length（長さの秒）、fps、ほかのパラメータ（{0}）、layer(番号, "x")（別のレイヤーの値）',
+            variables.slice(0, 6).join(', ') + (variables.length > 6 ? ', …' : ''),
+          )}
+        </p>
+        <p>
+          {t(
+            '関数：sin cos tan abs min max clamp lerp floor round sqrt pow random noise rad deg など。例：sin(time * 3) * 100',
+          )}
+        </p>
+      </details>
+    </div>
+  );
+}
+
 function ParamField({
   def,
   target,
   value,
   disabled,
+  variables = [],
 }: {
   def: ParamDef;
   target: Target;
   value: unknown;
   disabled: boolean;
+  /** 式で参照できるパラメータ名 */
+  variables?: string[];
 }) {
   const change = (v: number | string | boolean) =>
     setParamAtPlayhead(target.obj.id, def.id, v, target.effectId);
   switch (def.kind) {
     case 'number':
+      if (def.animatable && isExpression(target.params[def.id]))
+        return (
+          <ExpressionField
+            def={def}
+            target={target}
+            computed={Number(value)}
+            disabled={disabled}
+            variables={variables.filter((v) => v !== def.id)}
+          />
+        );
       return (
         <>
           <NumberField
@@ -251,7 +347,27 @@ function ParamField({
             onChange={change}
             disabled={disabled}
             extra={
-              def.animatable && !disabled ? <KeyControls target={target} def={def} /> : undefined
+              def.animatable && !disabled ? (
+                <>
+                  <KeyControls target={target} def={def} />
+                  <button
+                    type="button"
+                    className="key-button expr-toggle"
+                    title={t('式で計算する')}
+                    aria-label={t('{0}を式で計算する', t(def.label))}
+                    onClick={() =>
+                      setParamAtPlayhead(
+                        target.obj.id,
+                        def.id,
+                        { expr: String(Math.round(Number(value) * 1000) / 1000) },
+                        target.effectId,
+                      )
+                    }
+                  >
+                    ƒx
+                  </button>
+                </>
+              ) : undefined
             }
           />
           {def.animatable && !disabled && <EaseRow target={target} def={def} />}
@@ -321,9 +437,15 @@ function EffectCard({
 }) {
   const def = getEffectDef(effect.type);
   const target: Target = { obj, effectId: effect.id, params: effect.params, local };
-  const values = Object.fromEntries(
-    (def?.params ?? []).map((p) => [p.id, valueAt(effect.params[p.id], local, p.default as never)]),
-  );
+  const fps = useEditor((s) => s.project.settings.fps);
+  const scene = useEditor((s) => currentScene(s));
+  const values = resolveEffectParams(effect, local, {
+    fps,
+    scene,
+    sceneFrame: obj.start + local,
+    length: obj.length,
+  });
+  const variables = (def?.params ?? []).filter((p) => p.kind === 'number').map((p) => p.id);
   return (
     <details open className={`effect-card ${effect.enabled ? '' : 'disabled-effect'}`}>
       <summary>
@@ -398,10 +520,35 @@ function EffectCard({
       {def?.params
         .filter((p) => !p.visibleIf || p.visibleIf(values))
         .map((p) => (
-          <ParamField key={p.id} def={p} target={target} value={values[p.id]} disabled={disabled} />
+          <ParamField
+            key={p.id}
+            def={p}
+            target={target}
+            value={values[p.id]}
+            disabled={disabled}
+            variables={variables}
+          />
         ))}
+      {effect.type === 'customShader' && <ShaderStatus code={String(values.code)} />}
     </details>
   );
+}
+
+/** ユーザー定義シェーダーのコンパイルの誤りと、実行の許可 */
+function ShaderStatus({ code }: { code: string }) {
+  const allowed = useCustomShaders((s) => s.allowed);
+  const error = useCustomShaders((s) => s.errors[code]);
+  if (!allowed)
+    return (
+      <p className="hint shader-status">
+        {t('開いたファイルのシェーダーは、許可するまで実行しません。')}
+        <button type="button" onClick={() => setCustomShadersAllowed(true)}>
+          {t('実行を許可する')}
+        </button>
+      </p>
+    );
+  if (error) return <pre className="error-text shader-status">{error}</pre>;
+  return null;
 }
 
 function EffectsSection({
@@ -521,7 +668,9 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
   );
   const def = getObjectDef(obj.type);
   const local = Math.min(Math.max(0, playhead - obj.start), obj.length - 1);
-  const values = resolveParams(obj, local);
+  const scene = useEditor((s) => currentScene(s));
+  const values = resolveParams(obj, local, { fps, scene, sceneFrame: obj.start + local });
+  const variables = def.params.filter((p) => p.kind === 'number').map((p) => p.id);
   const target: Target = { obj, params: obj.params, local };
   const keys = objectKeyTimes(obj);
 
@@ -605,6 +754,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
                 target={target}
                 value={values[p.id]}
                 disabled={locked}
+                variables={variables}
               />
             ))}
           </details>

@@ -1,6 +1,11 @@
-import { valueAt } from '../../core/animation/interpolate';
 import { effectDomain, getEffectDef } from '../../core/effects/definitions';
-import { fadeFactor, resolveEffects, type ResolvedEffect } from '../../core/evaluate/evaluate';
+import {
+  fadeFactor,
+  resolveEffects,
+  resolveParams,
+  type ResolvedEffect,
+  type ResolvedParams,
+} from '../../core/evaluate/evaluate';
 import { framesToSeconds, secondsToFrames } from '../../core/model/time';
 import type { Project, Rational, Scene, TimelineObject } from '../../core/model/types';
 import { getObjectDef } from '../../core/objects/definitions';
@@ -99,6 +104,16 @@ async function renderObject(
   const fadeIn = typeof p.fadeIn === 'number' ? p.fadeIn : 0;
   const fadeOut = typeof p.fadeOut === 'number' ? p.fadeOut : 0;
   const objDuration = src.end - src.start;
+  // 音量・パンはキーフレームや式で変わるので、フレームごとに評価して使い回す
+  let cachedFrame = Number.NaN;
+  let cachedVals: ResolvedParams = {};
+  const paramsAt = (frame: number) => {
+    if (frame !== cachedFrame) {
+      cachedFrame = frame;
+      cachedVals = resolveParams(obj, frame, { fps });
+    }
+    return cachedVals;
+  };
   const unwrapped = (i: number) => offset + (t0 + i / sr - src.start) * speed;
 
   // ループで素材の終わりをまたぐ場合は区間を分ける
@@ -128,8 +143,9 @@ async function renderObject(
       // 音量・パン・フェードはブロック単位で評価する
       const tl = t0 + block / sr;
       const localFrame = secondsToFrames(tl - src.start, fps);
-      const volume = valueAt(p.volume, localFrame, 100) / 100;
-      const [gl, gr] = panGains(valueAt(p.pan, localFrame, 0));
+      const vals = paramsAt(localFrame);
+      const volume = Number(vals.volume ?? 100) / 100;
+      const [gl, gr] = panGains(Number(vals.pan ?? 0));
       const fade = fadeFactor(tl - src.start, objDuration, fadeIn, fadeOut);
       const gain = volume * fade;
       if (gain === 0) continue;
@@ -181,7 +197,7 @@ async function renderWithEffects(
     const frame = secondsToFrames(t0 + (g - g0) / sr - src.start, fps);
     if (frame !== cachedFrame) {
       cachedFrame = frame;
-      cached = resolveEffects(obj.effects, frame, 'audio');
+      cached = resolveEffects(obj.effects, frame, 'audio', { fps, length: obj.length });
     }
     return cached;
   };

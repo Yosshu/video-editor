@@ -164,7 +164,9 @@ export function TextField({ def, value, onChange, disabled }: FieldProps<TextPar
       {def.multiline ? (
         <textarea
           id={id}
-          rows={3}
+          rows={def.code ? 12 : 3}
+          className={def.code ? 'code-input' : undefined}
+          spellCheck={def.code ? false : undefined}
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}

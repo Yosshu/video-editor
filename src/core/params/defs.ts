@@ -35,6 +35,8 @@ export interface TextParamDef extends ParamDefBase {
   kind: 'text';
   default: string;
   multiline?: boolean;
+  /** プログラムのコード（等幅の大きな入力欄にする） */
+  code?: boolean;
 }
 
 export interface FontParamDef extends ParamDefBase {

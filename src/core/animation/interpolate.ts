@@ -1,8 +1,14 @@
-import type { Animated, Keyframe, ParamValue } from '../model/types';
+import type { Animated, Expression, Keyframe, ParamValue } from '../model/types';
 import { applyEase, isSpecialEase, specialValue } from './ease';
 
 export function isAnimated(value: ParamValue | undefined): value is Animated {
   return typeof value === 'object' && value !== null && Array.isArray((value as Animated).keys);
+}
+
+export function isExpression(value: ParamValue | undefined): value is Expression {
+  return (
+    typeof value === 'object' && value !== null && typeof (value as Expression).expr === 'string'
+  );
 }
 
 /** キーフレームを時刻順に並べ、同じ時刻の重複を後勝ちで取り除く */
@@ -54,6 +60,8 @@ export function valueAt(
 ): number | string | boolean {
   if (value === undefined) return fallback;
   if (isAnimated(value)) return keysValueAt(value.keys, t);
+  // 式は周りの情報が要るので、ここでは計算しない（resolveParams で計算する）
+  if (isExpression(value)) return fallback;
   if (typeof fallback === 'number' && typeof value !== 'number') return fallback;
   return value;
 }

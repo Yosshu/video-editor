@@ -1,4 +1,6 @@
+import { DEFAULT_SHADER_CODE } from '../core/effects/definitions';
 import { newId } from '../core/model/ids';
+import type { ParamMap } from '../core/model/types';
 import { commit, getState } from '../state/store';
 import { t } from '../i18n';
 
@@ -19,7 +21,11 @@ export function addEffect(objectId: string, type: string): void {
   const { sceneId } = getState();
   commit(t('エフェクトの追加'), (draft) => {
     const o = draft.scenes.find((s) => s.id === sceneId)?.objects.find((x) => x.id === objectId);
-    o?.effects.push({ id: newId('fx'), type, enabled: true, params: {} });
+    // シェーダーの例のコードは、表示中の言語のものを入れておく
+    const code = t(DEFAULT_SHADER_CODE);
+    const params: ParamMap =
+      type === 'customShader' && code !== DEFAULT_SHADER_CODE ? { code } : {};
+    o?.effects.push({ id: newId('fx'), type, enabled: true, params });
   });
 }
 

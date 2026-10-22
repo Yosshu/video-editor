@@ -2,6 +2,7 @@ import { Compositor, type ComposedItem, type MediaProvider } from '../compose';
 import { Renderer } from '../render/Renderer';
 import { currentScene, getState, useEditor } from '../../state/store';
 import { assetRegistry } from '../media/registry';
+import { useCustomShaders } from '../effects/customShader';
 import { onPreviewFrameReady } from './previewMediaInstance';
 
 /**
@@ -36,6 +37,10 @@ export class PreviewEngine {
       }),
       assetRegistry.onChange(() => this.requestRender()),
       onPreviewFrameReady(() => this.requestRender()),
+      // ユーザー定義シェーダーの実行を許可したとき
+      useCustomShaders.subscribe((state, prev) => {
+        if (state.allowed !== prev.allowed) this.requestRender();
+      }),
     );
     this.requestRender();
   }

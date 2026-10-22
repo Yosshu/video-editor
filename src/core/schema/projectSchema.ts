@@ -34,6 +34,7 @@ const paramValueSchema = z.union([
   z.string().max(100_000),
   z.boolean(),
   z.object({ keys: z.array(keyframeSchema).max(10_000) }).loose(),
+  z.object({ expr: z.string().max(2_000) }).loose(),
 ]);
 
 export const paramMapSchema = z.record(z.string().max(128), paramValueSchema);

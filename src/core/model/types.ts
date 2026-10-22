@@ -95,7 +95,12 @@ export interface Animated {
   keys: Keyframe[];
 }
 
-export type ParamValue = number | string | boolean | Animated;
+/** 式で計算する値（src/core/expr/expr.ts） */
+export interface Expression {
+  expr: string;
+}
+
+export type ParamValue = number | string | boolean | Animated | Expression;
 
 export type ParamMap = Record<string, ParamValue>;
 

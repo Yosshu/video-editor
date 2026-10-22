@@ -1,6 +1,12 @@
 import { hash01 } from '../../core/animation/ease';
 import type { ResolvedParams } from '../../core/evaluate/evaluate';
 import { createProgram, parseColor, type Program, type RenderTarget } from '../render/gl';
+import {
+  CUSTOM_HEADER,
+  CUSTOM_MAIN,
+  customShadersAllowed,
+  reportShaderResult,
+} from './customShader';
 import type { RenderTargetPool } from '../render/targetPool';
 
 /**
@@ -457,10 +463,47 @@ export class EffectRunner {
     private vao: WebGLVertexArrayObject,
   ) {}
 
+  /** ユーザー定義シェーダーのコード（プログラム名 → コード） */
+  private customSources = new Map<string, string>();
+  /** コンパイルに失敗したユーザー定義シェーダー（毎フレーム失敗し直さないよう覚えておく） */
+  private customFailures = new Map<string, string>();
+
+  /**
+   * ユーザー定義シェーダーを用意して、pass に渡す名前を返す。コンパイルできなければ例外（メッセージは誤りの内容）
+   */
+  customShader(code: string): string {
+    let h = 2166136261;
+    for (let i = 0; i < code.length; i++) h = Math.imul(h ^ code.charCodeAt(i), 16777619);
+    const name = `custom:${(h >>> 0).toString(36)}:${code.length}`;
+    const failed = this.customFailures.get(name);
+    if (failed) throw new Error(failed);
+    if (!this.programs.has(name)) {
+      this.customSources.set(name, CUSTOM_HEADER + code + CUSTOM_MAIN);
+      try {
+        this.program(name);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        this.customSources.delete(name);
+        if (this.customFailures.size > 32) this.customFailures.clear();
+        this.customFailures.set(name, message);
+        throw e;
+      }
+      // 使わなくなった古いものを捨てる
+      const customs = [...this.programs.keys()].filter((k) => k.startsWith('custom:'));
+      if (customs.length > 16) {
+        const old = customs[0];
+        this.gl.deleteProgram(this.programs.get(old)!.program);
+        this.programs.delete(old);
+        this.customSources.delete(old);
+      }
+    }
+    return name;
+  }
+
   private program(name: string): Program {
     let p = this.programs.get(name);
     if (!p) {
-      const fs = PRELUDE + SHADERS[name];
+      const fs = PRELUDE + (this.customSources.get(name) ?? SHADERS[name]);
       const uniformNames = [
         ...new Set([...fs.matchAll(/uniform\s+\w+\s+(u\w+)/g)].map((m) => m[1])),
       ];
@@ -903,6 +946,36 @@ export const EFFECT_IMPLS: Record<string, EffectApply> = {
       uWidth: n(p.width) * res,
       uFeather: n(p.feather) * res,
     });
+  },
+
+  customShader: (r, input, p, res, expand) => {
+    const code = String(p.code);
+    if (!customShadersAllowed()) return same(r, input, 'copy', {});
+    let name: string;
+    try {
+      name = r.customShader(code);
+      reportShaderResult(code, null);
+    } catch (e) {
+      reportShaderResult(code, e instanceof Error ? e.message : String(e));
+      return same(r, input, 'copy', {});
+    }
+    const pad = expand ? Math.ceil(Math.max(0, n(p.padding)) * res) : 0;
+    const out = r.pass(
+      name,
+      input.target,
+      input.target.width + pad * 2,
+      input.target.height + pad * 2,
+      {
+        uTime: n(p._time),
+        uFrame: n(p._frame),
+        uParam1: n(p.param1),
+        uParam2: n(p.param2),
+        uParam3: n(p.param3),
+        uParam4: n(p.param4),
+      },
+      [pad, pad],
+    );
+    return grown(input, out, pad, res);
   },
 
   // 登場・退場のワイプ（内部用）

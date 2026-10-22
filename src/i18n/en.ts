@@ -781,4 +781,41 @@ export const EN: Record<string, string> = {
   曲のテンポに合わせた目盛り: "Grid that matches the song's tempo",
   '右クリックでオブジェクトを追加 ・ 素材をドロップして配置':
     'Right-click to add objects · Drop media to place it',
+  文字列が閉じていません: "A string isn't closed",
+  '使えない文字です：{0}': 'Invalid character: {0}',
+  式が長すぎます: 'The expression is too long',
+  '「{0}」が必要です': '"{0}" is expected',
+  式の入れ子が深すぎます: 'The expression is nested too deeply',
+  式が途中で終わっています: 'The expression ends unexpectedly',
+  'ここに「{0}」は書けません': '"{0}" can\'t be used here',
+  式が空です: 'The expression is empty',
+  '余分な「{0}」があります': 'Unexpected "{0}"',
+  数値が必要なところに文字列があります: 'A string is used where a number is needed',
+  '「{0}」はありません': '"{0}" doesn\'t exist',
+  '演算子「{0}」は使えません': 'The operator "{0}" can\'t be used',
+  '関数「{0}」はありません': 'There\'s no function "{0}"',
+  式をやめて数値にする: 'Stop using an expression',
+  '{0}の式をやめる': 'Stop the expression of {0}',
+  '{0}の式': 'Expression of {0}',
+  式の書き方: 'How to write expressions',
+  '使える値：time（秒）、frame、length（長さの秒）、fps、ほかのパラメータ（{0}）、layer(番号, "x")（別のレイヤーの値）':
+    'Values: time (seconds), frame, length (seconds), fps, other parameters ({0}), layer(number, "x") (a value on another layer)',
+  '関数：sin cos tan abs min max clamp lerp floor round sqrt pow random noise rad deg など。例：sin(time * 3) * 100':
+    'Functions: sin cos tan abs min max clamp lerp floor round sqrt pow random noise rad deg, etc. Example: sin(time * 3) * 100',
+  式で計算する: 'Use an expression',
+  '{0}を式で計算する': 'Use an expression for {0}',
+  'このプロジェクトには、ユーザーが書いたシェーダー（エフェクト「シェーダー（自作）」）が含まれています。信頼できるファイルなら実行してください。実行しますか？':
+    'This project contains user-written shaders (the "Shader (custom)" effect). Run them only if you trust the file. Run them?',
+  '// 例：画像を横に波打たせる\n// uv は 0〜1 の座標、src(uv) で元の画像の色を読む\n// uTime は秒、uParam1〜uParam4 は下のパラメータ\nvec4 effect(vec2 uv) {\n  uv.x += sin(uv.y * 20.0 + uTime * 3.0) * 0.01 * uParam1;\n  return src(uv);\n}\n':
+    '// Example: make the image wave horizontally\n// uv is the 0–1 coordinate; src(uv) reads the original color\n// uTime is in seconds; uParam1–uParam4 are the parameters below\nvec4 effect(vec2 uv) {\n  uv.x += sin(uv.y * 20.0 + uTime * 3.0) * 0.01 * uParam1;\n  return src(uv);\n}\n',
+  'シェーダー（自作）': 'Shader (custom)',
+  'コード（GLSL）': 'Code (GLSL)',
+  'パラメータ 1': 'Parameter 1',
+  'パラメータ 2': 'Parameter 2',
+  'パラメータ 3': 'Parameter 3',
+  'パラメータ 4': 'Parameter 4',
+  描画範囲の余白: 'Extra drawing margin',
+  '開いたファイルのシェーダーは、許可するまで実行しません。':
+    "Shaders from an opened file don't run until you allow them.",
+  実行を許可する: 'Allow',
 };

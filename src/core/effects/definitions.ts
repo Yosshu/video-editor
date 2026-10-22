@@ -785,6 +785,45 @@ const MORE_VIDEO_EFFECTS: EffectDef[] = [
   },
 ];
 
+/** ユーザー定義シェーダーの最初のコード（例） */
+export const DEFAULT_SHADER_CODE = `// 例：画像を横に波打たせる
+// uv は 0〜1 の座標、src(uv) で元の画像の色を読む
+// uTime は秒、uParam1〜uParam4 は下のパラメータ
+vec4 effect(vec2 uv) {
+  uv.x += sin(uv.y * 20.0 + uTime * 3.0) * 0.01 * uParam1;
+  return src(uv);
+}
+`;
+
+/** ユーザー定義シェーダー */
+const CUSTOM_EFFECTS: EffectDef[] = [
+  {
+    type: 'customShader',
+    label: 'シェーダー（自作）',
+    category: '加工',
+    params: [
+      {
+        id: 'code',
+        label: 'コード（GLSL）',
+        kind: 'text',
+        default: DEFAULT_SHADER_CODE,
+        multiline: true,
+        code: true,
+      },
+      numberParam('param1', 'パラメータ 1', 1, { sliderMin: -10, sliderMax: 10, step: 0.01 }),
+      numberParam('param2', 'パラメータ 2', 0, { sliderMin: -10, sliderMax: 10, step: 0.01 }),
+      numberParam('param3', 'パラメータ 3', 0, { sliderMin: -10, sliderMax: 10, step: 0.01 }),
+      numberParam('param4', 'パラメータ 4', 0, { sliderMin: -10, sliderMax: 10, step: 0.01 }),
+      numberParam('padding', '描画範囲の余白', 0, {
+        min: 0,
+        max: 2000,
+        sliderMax: 500,
+        unit: 'px',
+      }),
+    ],
+  },
+];
+
 /** 音声エフェクト */
 const AUDIO_EFFECTS: EffectDef[] = [
   {
@@ -867,7 +906,12 @@ const AUDIO_EFFECTS: EffectDef[] = [
   },
 ];
 
-export const EFFECTS: EffectDef[] = [...VIDEO_EFFECTS, ...MORE_VIDEO_EFFECTS, ...AUDIO_EFFECTS];
+export const EFFECTS: EffectDef[] = [
+  ...VIDEO_EFFECTS,
+  ...MORE_VIDEO_EFFECTS,
+  ...CUSTOM_EFFECTS,
+  ...AUDIO_EFFECTS,
+];
 
 export const EFFECT_MAP: Record<string, EffectDef> = Object.fromEntries(
   EFFECTS.map((e) => [e.type, e]),

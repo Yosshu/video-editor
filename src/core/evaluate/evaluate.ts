@@ -1,22 +1,117 @@
 import { EASE_PRESETS } from '../animation/ease';
-import { valueAt } from '../animation/interpolate';
+import { isExpression, valueAt } from '../animation/interpolate';
+import { compileExpr, evalExpr, ExprError, type ExprScope } from '../expr/expr';
 import { effectDomain, getEffectDef, type EffectDomain } from '../effects/definitions';
-import { framesToSeconds } from '../model/time';
-import type { EffectInstance, Rational, Scene, TimelineObject } from '../model/types';
+import { framesToSeconds, fpsValue } from '../model/time';
+import type { EffectInstance, ParamMap, Rational, Scene, TimelineObject } from '../model/types';
 import { getObjectDef, type ObjectTypeDef, type TransitionType } from '../objects/definitions';
-import type { ResolvedValue } from '../params/defs';
+import type { ParamDef, ResolvedValue } from '../params/defs';
 
 export type ResolvedParams = Record<string, ResolvedValue>;
 
-/** オブジェクトのパラメータを相対フレーム t で評価する（既定値で補完） */
-export function resolveParams(obj: TimelineObject, t: number): ResolvedParams {
-  const def = getObjectDef(obj.type);
+/** 式を評価するときの周りの情報 */
+export interface ParamContext {
+  fps: Rational;
+  /** レイヤーの参照（layer(2, "x")）に使うシーンと、シーンの時刻（フレーム） */
+  scene?: Scene;
+  sceneFrame?: number;
+  /** 参照の深さ（参照が循環しても止まるように） */
+  depth?: number;
+}
+
+const DEFAULT_FPS: Rational = { num: 30, den: 1 };
+/** レイヤーの参照をたどる深さの上限 */
+const MAX_REF_DEPTH = 4;
+
+/** 式で使える変数（パラメータ名のほか） */
+export const EXPR_VARIABLES = ['time', 'frame', 'length', 'fps'];
+
+/**
+ * パラメータの定義と保存された値から、時刻 t（相対フレーム）の値を求める。
+ * 式のパラメータは、ほかのパラメータ・時刻・別のレイヤーの値を使って計算する（誤りがあれば既定値）。
+ */
+function resolveList(
+  defs: ParamDef[],
+  raw: ParamMap,
+  t: number,
+  lengthFrames: number,
+  ctx: ParamContext | undefined,
+): ResolvedParams {
   const out: ResolvedParams = {};
-  for (const p of def.params) {
-    const raw = obj.params[p.id];
-    out[p.id] = valueAt(raw, t, p.default as never);
+  const pending = new Map<string, string>();
+  for (const p of defs) {
+    const v = raw[p.id];
+    if (isExpression(v) && p.kind === 'number') pending.set(p.id, v.expr);
+    else out[p.id] = valueAt(v, t, p.default as never);
   }
+  if (pending.size === 0) return out;
+  const fps = ctx?.fps ?? DEFAULT_FPS;
+  const visiting = new Set<string>();
+  const evaluate = (id: string): number => {
+    const known = out[id];
+    if (typeof known === 'number') return known;
+    const def = defs.find((d) => d.id === id)!;
+    if (visiting.has(id)) throw new ExprError('cycle');
+    visiting.add(id);
+    let value: number;
+    try {
+      value = evalExpr(compileExpr(pending.get(id)!), scope);
+    } catch {
+      value = Number(def.default);
+    }
+    visiting.delete(id);
+    out[id] = value;
+    return value;
+  };
+  const scope: ExprScope = {
+    variable(name) {
+      if (name === 'time') return framesToSeconds(t, fps);
+      if (name === 'frame') return t;
+      if (name === 'length') return framesToSeconds(lengthFrames, fps);
+      if (name === 'fps') return fpsValue(fps);
+      if (pending.has(name)) return evaluate(name);
+      const v = out[name];
+      if (typeof v === 'number') return v;
+      if (typeof v === 'boolean') return v ? 1 : 0;
+      return undefined;
+    },
+    call(name, args) {
+      if (name !== 'layer') return undefined;
+      const [n, param] = args;
+      if (typeof n !== 'number' || typeof param !== 'string') return undefined;
+      const scene = ctx?.scene;
+      const f = ctx?.sceneFrame;
+      if (!scene || f === undefined || (ctx?.depth ?? 0) >= MAX_REF_DEPTH) return 0;
+      const o = scene.objects.find(
+        (x) => x.layer === Math.round(n) && f >= x.start && f < x.start + x.length,
+      );
+      if (!o) return 0;
+      const v = resolveParams(o, f - o.start, { ...ctx!, depth: (ctx?.depth ?? 0) + 1 })[param];
+      return typeof v === 'number' ? v : typeof v === 'boolean' ? Number(v) : 0;
+    },
+  };
+  for (const id of pending.keys()) evaluate(id);
   return out;
+}
+
+/**
+ * オブジェクトのパラメータを相対フレーム t で評価する（既定値で補完）。
+ * ctx を渡すと、式の時刻の計算とレイヤーの参照が正しくなる
+ */
+export function resolveParams(obj: TimelineObject, t: number, ctx?: ParamContext): ResolvedParams {
+  const def = getObjectDef(obj.type);
+  const c = ctx ? { ...ctx, sceneFrame: ctx.sceneFrame ?? obj.start + t } : undefined;
+  return resolveList(def.params, obj.params, t, obj.length, c);
+}
+
+/** 1 つのエフェクトのパラメータを評価する（設定パネルの表示用。無効なエフェクトも評価する） */
+export function resolveEffectParams(
+  effect: EffectInstance,
+  t: number,
+  ctx?: ParamContext & { length?: number },
+): ResolvedParams {
+  const def = getEffectDef(effect.type);
+  return def ? resolveList(def.params, effect.params, t, ctx?.length ?? 0, ctx) : {};
 }
 
 export interface ResolvedEffect {
@@ -40,8 +135,9 @@ export function resolveEffects(
   effects: EffectInstance[],
   t: number,
   domain: EffectDomain = 'video',
-  fps?: Rational,
+  ctx?: ParamContext & { length?: number },
 ): ResolvedEffect[] {
+  const fps = ctx?.fps;
   const out: ResolvedEffect[] = [];
   for (const e of effects) {
     const def = getEffectDef(e.type);
@@ -49,7 +145,7 @@ export function resolveEffects(
     // 時間で変わるエフェクト（振動・ノイズなど）のために、時刻と乱数の種も渡す
     const params: ResolvedParams = { _frame: t, _seed: stringHash(e.id) };
     if (fps) params._time = framesToSeconds(t, fps);
-    for (const p of def.params) params[p.id] = valueAt(e.params[p.id], t, p.default as never);
+    Object.assign(params, resolveList(def.params, e.params, t, ctx?.length ?? 0, ctx));
     out.push({ id: e.id, type: e.type, params });
   }
   return out;
@@ -240,8 +336,12 @@ export function evaluateFrame(scene: Scene, frame: number, ctx: EvaluateContext)
     const f = frameFor(object.layer);
     if (!isActive(object, f)) continue;
     const localFrame = f - object.start;
-    const params = resolveParams(object, localFrame);
-    const effects = resolveEffects(object.effects, localFrame, 'video', ctx.fps);
+    const pctx: ParamContext = { fps: ctx.fps, scene, sceneFrame: f };
+    const params = resolveParams(object, localFrame, pctx);
+    const effects = resolveEffects(object.effects, localFrame, 'video', {
+      ...pctx,
+      length: object.length,
+    });
     const localSeconds = framesToSeconds(localFrame, ctx.fps);
     const duration = framesToSeconds(object.length, ctx.fps);
     if (def.control) {

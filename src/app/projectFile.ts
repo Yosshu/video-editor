@@ -6,6 +6,7 @@ import {
 } from '../core/project/factory';
 import { parseProject, ProjectFileError, serializeProject } from '../core/project/serialize';
 import type { Project, ProjectSettings } from '../core/model/types';
+import { projectHasCustomShaders, setCustomShadersAllowed } from '../engine/effects/customShader';
 import { extensionOf, isPackageFileName } from '../engine/media/detect';
 import { assetRegistry } from '../engine/media/registry';
 import { downloadBlob, isAbortError } from '../storage/download';
@@ -93,9 +94,28 @@ async function loadProject(
 ): Promise<void> {
   assetRegistry.clear();
   replaceProject(project, fileName);
+  confirmCustomShaders(project);
   for (const w of warnings) notify(w);
   const missing = await restoreAssets(project);
   if (missing.length > 0) openDialog({ type: 'missingAssets' });
+}
+
+/**
+ * 開いたプロジェクトにユーザー定義シェーダーがあれば、実行してよいか確かめる
+ * （ほかの人が作ったファイルの場合に、知らないうちに重い処理が動かないように）
+ */
+function confirmCustomShaders(project: Project): void {
+  if (!projectHasCustomShaders(project)) {
+    setCustomShadersAllowed(true);
+    return;
+  }
+  setCustomShadersAllowed(
+    window.confirm(
+      t(
+        'このプロジェクトには、ユーザーが書いたシェーダー（エフェクト「シェーダー（自作）」）が含まれています。信頼できるファイルなら実行してください。実行しますか？',
+      ),
+    ),
+  );
 }
 
 /** 編集ファイル（または素材同梱パッケージ）を開く */
@@ -317,6 +337,7 @@ export async function openPackageFile(file: File, handle?: FileSystemFileHandle)
     currentHandle = null;
     assetRegistry.clear();
     replaceProject(project, file.name.replace(/\.vedpack$/i, PROJECT_EXTENSION));
+    confirmCustomShaders(project);
     for (const w of warnings) notify(w);
     for (const asset of project.assets) {
       const entry = entries.find(

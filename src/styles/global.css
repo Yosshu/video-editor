@@ -1539,3 +1539,53 @@ kbd {
 .menu-settings select {
   font-size: 12px;
 }
+
+/* 式で計算するパラメータ */
+.expr-toggle {
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+
+.expr-toggle.on {
+  color: var(--accent);
+}
+
+.expr-input {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.expr-info {
+  min-height: 16px;
+  font-size: 11px;
+}
+
+.expr-help {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.expr-help p {
+  margin: 4px 0;
+}
+
+/* ユーザー定義シェーダー */
+.code-input {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.shader-status {
+  margin: 4px 0 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.shader-status button {
+  margin-left: 6px;
+}

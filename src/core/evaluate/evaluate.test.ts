@@ -153,3 +153,42 @@ describe('エフェクトと登場・退場', () => {
     expect(items[1].effects.map((e) => e.type)).toEqual(['monochrome']);
   });
 });
+
+describe('式のパラメータ', () => {
+  it('時刻・ほかのパラメータ・別のレイヤーの値から計算する', () => {
+    const a = createObject('shape', 1, 0, 60, {
+      params: {
+        x: { expr: 'time * 100' },
+        y: { expr: 'x + 10' },
+        rotation: { expr: 'layer(2, "x") * 2' },
+      },
+    });
+    const b = createObject('shape', 2, 0, 60, { params: { x: 40 } });
+    const scene: Scene = { id: 's', name: 's', width: 1, height: 1, layers: [], objects: [a, b] };
+    const [item] = evaluateFrame(scene, 15, { fps });
+    expect(item.params.x).toBeCloseTo(50);
+    expect(item.params.y).toBeCloseTo(60);
+    expect(item.params.rotation).toBe(80);
+  });
+
+  it('誤りや循環があれば既定値を使う', () => {
+    const o = createObject('shape', 1, 0, 60, {
+      params: { x: { expr: 'y + 1' }, y: { expr: 'x + 1' }, scale: { expr: '1 +' } },
+    });
+    const scene: Scene = { id: 's', name: 's', width: 1, height: 1, layers: [], objects: [o] };
+    const [item] = evaluateFrame(scene, 0, { fps });
+    expect(item.params.scale).toBe(100);
+    expect(Number.isFinite(Number(item.params.x))).toBe(true);
+    expect(Number.isFinite(Number(item.params.y))).toBe(true);
+  });
+
+  it('エフェクトのパラメータにも使える', () => {
+    const [e] = resolveEffects(
+      [{ id: 'fx', type: 'blur', enabled: true, params: { radius: { expr: 'frame / 2' } } }],
+      10,
+      'video',
+      { fps },
+    );
+    expect(e.params.radius).toBe(5);
+  });
+});
