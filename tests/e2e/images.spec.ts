@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { disableFileSystemAccess, previewPixel, seekRuler, timelineObjects } from './helpers';
+import {
+  addObjectAt,
+  disableFileSystemAccess,
+  previewPixel,
+  seekRuler,
+  timelineObjects,
+} from './helpers';
 
 const near = (a: number[], b: number[], tol = 40) => a.every((v, i) => Math.abs(v - b[i]) <= tol);
 
@@ -17,6 +23,7 @@ async function seekFrame(page: Page, frame: number): Promise<void> {
 
 const RED = [255, 0, 0];
 const BLUE = [0, 0, 255];
+const WHITE = [255, 255, 255];
 
 test.beforeEach(async ({ page }) => {
   await disableFileSystemAccess(page);
@@ -44,4 +51,54 @@ test('アニメーション画像（GIF）はコマが時間で切り替わる',
   // ループしなければ最後のコマ（青）で止まる
   await page.getByLabel('ループ再生').uncheck();
   await expect.poll(async () => near(await previewPixel(page, 0.5, 0.5), BLUE)).toBe(true);
+});
+
+test('連番画像を 1 本の動画として読み込み、透明度も残す', async ({ page }) => {
+  // 左半分が透明な 10 枚（1〜5 が赤、6〜10 が青）。名前の数字の順に並べる
+  const files = Array.from({ length: 10 }, (_, i) => `tests/fixtures/seq/frame_${i + 1}.png`);
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: '連番画像…' }).click();
+  await (await chooser).setFiles(files.reverse());
+  await expect(page.getByText('10 枚の画像を')).toBeVisible();
+  await page.getByLabel('フレームレート').fill('10');
+  await page.getByRole('button', { name: '読み込む' }).click();
+  await expect(page.locator('.asset-item')).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.locator('.asset-item')).toContainText('frame_1-10.webm');
+  await expect(page.locator('.asset-item')).toContainText('0:01');
+
+  // 下のレイヤーに白い単色を置き、透明な部分から見えるようにする
+  await addObjectAt(page, '単色を追加', 1, 10);
+  await page.locator('.asset-item').first().dblclick();
+  await expect(timelineObjects(page)).toHaveCount(2);
+  await expect(page.getByLabel('長さ')).toHaveValue('30');
+  const right = 0.5 + 40 / 1920;
+  const left = 0.5 - 40 / 1920;
+  await seekFrame(page, 7);
+  await expect.poll(async () => near(await previewPixel(page, right, 0.5), RED)).toBe(true);
+  // 透明な部分は下の単色（白）が見える
+  await expect.poll(async () => near(await previewPixel(page, left, 0.5), WHITE)).toBe(true);
+  await seekFrame(page, 22);
+  await expect.poll(async () => near(await previewPixel(page, right, 0.5), BLUE)).toBe(true);
+  await expect.poll(async () => near(await previewPixel(page, left, 0.5), WHITE)).toBe(true);
+});
+
+test('連番画像から作った動画は、再読み込みしてもブラウザから復元される', async ({ page }) => {
+  const files = Array.from({ length: 10 }, (_, i) => `tests/fixtures/seq/frame_${i + 1}.png`);
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: '連番画像…' }).click();
+  await (await chooser).setFiles(files);
+  await page.getByLabel('フレームレート').fill('10');
+  await page.getByRole('button', { name: '読み込む' }).click();
+  await expect(page.locator('.asset-item')).toHaveCount(1, { timeout: 30_000 });
+  await page.locator('.asset-item').first().dblclick();
+  await expect(timelineObjects(page)).toHaveCount(1);
+  await page.waitForTimeout(2500);
+  await page.reload();
+  await page.getByRole('button', { name: '復元する' }).click();
+  await expect(page.locator('.asset-item')).toContainText('0:01');
+  await expect(page.getByRole('dialog', { name: '見つからない素材があります' })).toHaveCount(0);
+  await seekFrame(page, 22);
+  await expect
+    .poll(async () => near(await previewPixel(page, 0.5 + 40 / 1920, 0.5), BLUE))
+    .toBe(true);
 });

@@ -1,8 +1,10 @@
 import type { Asset, Project } from '../core/model/types';
 import { computeFingerprint } from '../engine/media/fingerprint';
 import { AssetImportError, assetRegistry } from '../engine/media/registry';
+import { encodeImageSequence } from '../engine/media/sequence';
 import { idbGet, idbSet } from '../storage/idb';
 import { commit, getState, notify, setAssetStatus } from '../state/store';
+import { useUi } from '../state/ui';
 import { t } from '../i18n';
 
 export interface IncomingFile {
@@ -56,6 +58,36 @@ async function rememberHandle(
     await idbSet('handles', fingerprint, handle);
   } catch {
     // ハンドルを保存できない環境では何もしない
+  }
+}
+
+/**
+ * 連番画像を動画にまとめて素材に加える。
+ * 作った動画はどこにもファイルがないので、次回も使えるようブラウザに保存しておく
+ */
+export async function importImageSequence(files: File[], fps: number): Promise<Asset[]> {
+  const label = t('連番画像を動画にまとめています…');
+  useUi.setState({ busy: { label, progress: 0 } });
+  try {
+    const file = await encodeImageSequence(files, {
+      fps,
+      onProgress: (done, total) => useUi.setState({ busy: { label, progress: done / total } }),
+    });
+    const assets = await importMediaFiles([{ file }]);
+    for (const asset of assets) {
+      try {
+        await idbSet('handles', `gen:${asset.fingerprint}`, file);
+      } catch {
+        // 保存できなければ、次回は不足素材になる（素材ごと保存すれば残る）
+      }
+    }
+    return assets;
+  } catch (e) {
+    notify(e instanceof Error ? e.message : String(e), 'error');
+    console.error(e);
+    return [];
+  } finally {
+    useUi.setState({ busy: null });
   }
 }
 
@@ -129,6 +161,13 @@ export async function restoreAssets(project: Project): Promise<Asset[]> {
             setAssetStatus(asset.id, 'ready');
             return;
           }
+        }
+        // 連番画像から作った動画は、ブラウザに保存したものを使う
+        const generated = await idbGet<File>('handles', `gen:${asset.fingerprint}`);
+        if (generated && generated.size === asset.size) {
+          await assetRegistry.attach(asset, generated);
+          setAssetStatus(asset.id, 'ready');
+          return;
         }
       } catch {
         // 復元できなければ不足素材として扱う

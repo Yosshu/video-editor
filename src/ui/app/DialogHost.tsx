@@ -2,6 +2,7 @@ import { useUi } from '../../state/ui';
 import { AboutDialog } from './dialogs/AboutDialog';
 import { BeatGridDialog } from './dialogs/BeatGridDialog';
 import { ExportDialog } from './dialogs/ExportDialog';
+import { ImageSequenceDialog } from './dialogs/ImageSequenceDialog';
 import { MissingAssetsDialog } from './dialogs/MissingAssetsDialog';
 import { NewProjectDialog } from './dialogs/NewProjectDialog';
 import { PresetsDialog } from './dialogs/PresetsDialog';
@@ -31,5 +32,7 @@ export function DialogHost() {
       return <ShortcutsDialog />;
     case 'presets':
       return <PresetsDialog />;
+    case 'imageSequence':
+      return <ImageSequenceDialog files={dialog.files} />;
   }
 }

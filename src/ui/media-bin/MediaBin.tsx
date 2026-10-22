@@ -139,6 +139,22 @@ export function MediaBin() {
         <h2>{t('素材')}</h2>
         <button
           type="button"
+          title={t('名前に番号の付いた画像を、1 本の動画としてまとめて読み込みます')}
+          onClick={() =>
+            void pickFilesWithInput({ accept: 'image/*', multiple: true }).then((files) => {
+              if (files.length === 1) {
+                notify(t('連番画像は 2 枚以上選んでください。'), 'error');
+              } else if (files.length > 1) {
+                openDialog({ type: 'imageSequence', files });
+              }
+            })
+          }
+          disabled={busy}
+        >
+          {t('連番画像…')}
+        </button>
+        <button
+          type="button"
           onClick={() => void pickMediaFiles().then(importFiles)}
           disabled={busy}
         >

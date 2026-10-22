@@ -833,4 +833,15 @@ export const EN: Record<string, string> = {
   'LUT はタイムラインには置かず、エフェクト「LUT（色の変換表）」で選んで使います。':
     'LUTs aren\'t placed on the timeline. Choose them in the "LUT (color lookup table)" effect.',
   アニメーション画像: 'Animated image',
+  '連番画像を動画にまとめています…': 'Combining image sequence into a video…',
+  '連番画像は 2 枚以上選んでください。': 'Choose two or more images for an image sequence.',
+  連番画像の読み込み: 'Import image sequence',
+  読み込む: 'Import',
+  '{0} 枚の画像を、名前の順に 1 本の動画（WebM）にまとめて素材に加えます。':
+    'Combines {0} images, in name order, into one video (WebM) and adds it to media.',
+  '透明な部分のある画像は透明度も残します。まとめた動画はこのブラウザに保存され、次回も使えます（別の PC へ持っていくときは「素材ごと保存」を使ってください）。':
+    'Transparency is kept for images with transparent areas. The combined video is stored in this browser for next time (to take it to another PC, use "Save with media").',
+  '名前に番号の付いた画像を、1 本の動画としてまとめて読み込みます':
+    'Import numbered images together as one video',
+  '連番画像…': 'Image sequence…',
 };

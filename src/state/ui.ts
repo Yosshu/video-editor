@@ -11,6 +11,7 @@ export type DialogState =
   | { type: 'beatGrid' }
   | { type: 'shortcuts' }
   | { type: 'presets' }
+  | { type: 'imageSequence'; files: File[] }
   | { type: 'about' };
 
 export interface ContextMenuItem {
