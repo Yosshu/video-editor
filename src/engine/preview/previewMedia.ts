@@ -1,4 +1,5 @@
 import type { MediaProvider } from '../compose';
+import { peekPeaks } from '../audio/waveform';
 import { assetRegistry } from '../media/registry';
 import { getState } from '../../state/store';
 
@@ -10,5 +11,6 @@ export function createPreviewMedia(
     getImage: (id) => assetRegistry.getImage(id),
     getVideoFrame,
     assetDuration: (id) => getState().project.assets.find((a) => a.id === id)?.durationSec,
+    getPeaks: (id) => peekPeaks(id) ?? undefined,
   };
 }

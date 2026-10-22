@@ -578,6 +578,213 @@ const VIDEO_EFFECTS: EffectDef[] = [
   },
 ];
 
+/** 変形・光・加工などの映像エフェクト（Phase 7 で追加） */
+const MORE_VIDEO_EFFECTS: EffectDef[] = [
+  {
+    type: 'mirror',
+    label: 'ミラー',
+    category: '変形',
+    params: [
+      {
+        id: 'direction',
+        label: '反転して並べる向き',
+        kind: 'select',
+        default: 'right',
+        options: [
+          { value: 'right', label: '右' },
+          { value: 'left', label: '左' },
+          { value: 'bottom', label: '下' },
+          { value: 'top', label: '上' },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'vibrate',
+    label: '振動',
+    category: '変形',
+    params: [
+      numberParam('amountX', '横の揺れ幅', 10, { min: 0, max: 1000, sliderMax: 100, unit: 'px' }),
+      numberParam('amountY', '縦の揺れ幅', 10, { min: 0, max: 1000, sliderMax: 100, unit: 'px' }),
+      numberParam('interval', '揺れる間隔', 1, {
+        min: 1,
+        max: 300,
+        sliderMax: 30,
+        unit: 'フレーム',
+      }),
+    ],
+  },
+  {
+    type: 'wave',
+    label: '波打ち',
+    category: '変形',
+    params: [
+      numberParam('amplitude', '振れ幅', 20, { min: 0, max: 1000, sliderMax: 200, unit: 'px' }),
+      numberParam('wavelength', '波の長さ', 200, {
+        min: 1,
+        max: 5000,
+        sliderMax: 1000,
+        unit: 'px',
+      }),
+      numberParam('speed', '速さ', 1, {
+        min: -50,
+        max: 50,
+        sliderMin: -5,
+        sliderMax: 5,
+        step: 0.01,
+        unit: '回/秒',
+      }),
+      {
+        id: 'direction',
+        label: '揺れる向き',
+        kind: 'select',
+        default: 'horizontal',
+        options: [
+          { value: 'horizontal', label: '横' },
+          { value: 'vertical', label: '縦' },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'polar',
+    label: '極座標変換',
+    category: '変形',
+    params: [
+      {
+        id: 'center',
+        label: '円の中心にする辺',
+        kind: 'select',
+        default: 'top',
+        options: [
+          { value: 'top', label: '上の辺' },
+          { value: 'bottom', label: '下の辺' },
+        ],
+      },
+      numberParam('rotation', '回転', 0, { sliderMin: -360, sliderMax: 360, step: 0.1, unit: '°' }),
+    ],
+  },
+  {
+    type: 'displace',
+    label: 'ゆがみ（膨らみ・へこみ・渦巻き）',
+    category: '変形',
+    params: [
+      {
+        id: 'kind',
+        label: '種類',
+        kind: 'select',
+        default: 'bulge',
+        options: [
+          { value: 'bulge', label: '膨らみ' },
+          { value: 'pinch', label: 'へこみ' },
+          { value: 'twirl', label: '渦巻き' },
+        ],
+      },
+      numberParam('x', 'X', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+      numberParam('y', 'Y', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+      numberParam('radius', '範囲', 200, { min: 1, max: 5000, sliderMax: 1000, unit: 'px' }),
+      numberParam('strength', '強さ', 50, { min: -100, max: 100, step: 0.1, unit: '%' }),
+    ],
+  },
+  {
+    type: 'tile',
+    label: '画像ループ（並べる）',
+    category: '変形',
+    params: [
+      numberParam('countX', '横の数', 2, { min: 1, max: 50, sliderMax: 10 }),
+      numberParam('countY', '縦の数', 2, { min: 1, max: 50, sliderMax: 10 }),
+      numberParam('offsetX', '横のずらし', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+      numberParam('offsetY', '縦のずらし', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+    ],
+  },
+  {
+    type: 'light',
+    label: 'ライト',
+    category: '光',
+    params: [
+      numberParam('x', 'X', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+      numberParam('y', 'Y', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+      numberParam('radius', '範囲', 300, { min: 1, max: 5000, sliderMax: 1500, unit: 'px' }),
+      numberParam('intensity', '強さ', 60, {
+        min: 0,
+        max: 400,
+        sliderMax: 200,
+        step: 0.1,
+        unit: '%',
+      }),
+      color('color', '光の色', '#ffffff'),
+    ],
+  },
+  {
+    type: 'directionalBlur',
+    label: '方向ブラー',
+    category: 'ぼかし',
+    params: [
+      numberParam('length', '長さ', 30, { min: 0, max: 1000, sliderMax: 200, unit: 'px' }),
+      numberParam('angle', '角度', 0, { sliderMin: -180, sliderMax: 180, step: 0.1, unit: '°' }),
+    ],
+  },
+  {
+    type: 'radialBlur',
+    label: '放射ブラー',
+    category: 'ぼかし',
+    params: [
+      numberParam('strength', '強さ', 20, { min: 0, max: 100, step: 0.1, unit: '%' }),
+      numberParam('x', '中心 X', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+      numberParam('y', '中心 Y', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+    ],
+  },
+  {
+    type: 'noise',
+    label: 'ノイズ',
+    category: '加工',
+    params: [
+      numberParam('amount', '強さ', 30, { min: 0, max: 100, step: 0.1, unit: '%' }),
+      numberParam('size', '粒の大きさ', 1, { min: 1, max: 100, sliderMax: 20, unit: 'px' }),
+      { id: 'colored', label: '色つきのノイズ', kind: 'boolean', default: false },
+      { id: 'animated', label: 'フレームごとに変える', kind: 'boolean', default: true },
+    ],
+  },
+  {
+    type: 'chromaticShift',
+    label: '色ずれ',
+    category: '加工',
+    params: [
+      numberParam('offset', 'ずれ幅', 6, {
+        min: 0,
+        max: 500,
+        sliderMax: 50,
+        step: 0.1,
+        unit: 'px',
+      }),
+      numberParam('angle', '角度', 0, { sliderMin: -180, sliderMax: 180, step: 0.1, unit: '°' }),
+    ],
+  },
+  {
+    type: 'diagonalClip',
+    label: '斜めクリッピング',
+    category: '切り抜き',
+    params: [
+      numberParam('x', '中心 X', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+      numberParam('y', '中心 Y', 0, { sliderMin: -1000, sliderMax: 1000, unit: 'px' }),
+      numberParam('angle', '角度', 0, { sliderMin: -180, sliderMax: 180, step: 0.1, unit: '°' }),
+      numberParam('width', '残す幅（0 で片側を消す）', 0, {
+        min: 0,
+        max: 10000,
+        sliderMax: 1000,
+        unit: 'px',
+      }),
+      numberParam('feather', 'ぼかし', 0, {
+        min: 0,
+        max: 1000,
+        sliderMax: 200,
+        step: 0.1,
+        unit: 'px',
+      }),
+    ],
+  },
+];
+
 /** 音声エフェクト */
 const AUDIO_EFFECTS: EffectDef[] = [
   {
@@ -660,7 +867,7 @@ const AUDIO_EFFECTS: EffectDef[] = [
   },
 ];
 
-export const EFFECTS: EffectDef[] = [...VIDEO_EFFECTS, ...AUDIO_EFFECTS];
+export const EFFECTS: EffectDef[] = [...VIDEO_EFFECTS, ...MORE_VIDEO_EFFECTS, ...AUDIO_EFFECTS];
 
 export const EFFECT_MAP: Record<string, EffectDef> = Object.fromEntries(
   EFFECTS.map((e) => [e.type, e]),

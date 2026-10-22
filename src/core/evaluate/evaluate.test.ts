@@ -47,6 +47,27 @@ describe('evaluateFrame', () => {
     // 2 + 3秒×0.5 = 3.5 → 長さ 3 秒でループして 0.5
     expect(items[0].sourceTime).toBeCloseTo(0.5);
   });
+
+  it('音声波形オブジェクトは、対象のレイヤーの音声の素材内時刻を持つ', () => {
+    const audio = createObject('audio', 3, 30, 300, {
+      assetId: 'bgm',
+      params: { offset: 1, speed: 200 },
+    });
+    const wave = createObject('audioWave', 1, 0, 600, { params: { targetLayer: 3 } });
+    const scene: Scene = {
+      id: 's',
+      name: 's',
+      width: 1,
+      height: 1,
+      layers: [],
+      objects: [audio, wave],
+    };
+    const [item] = evaluateFrame(scene, 30 + 60, { fps, assetDuration: () => 100 });
+    // 1 + 2 秒 × 2 倍速 = 5 秒
+    expect(item.waveSource).toEqual({ assetId: 'bgm', time: 5, speed: 2 });
+    // 音声がない時刻では持たない
+    expect(evaluateFrame(scene, 10, { fps })[0].waveSource).toBeUndefined();
+  });
 });
 
 describe('fadeFactor / sourceTimeAt', () => {

@@ -1,5 +1,6 @@
 import type { Project, Scene } from '../../core/model/types';
 import { Compositor, type MediaProvider } from '../compose';
+import { loadPeaks, type Peaks } from '../audio/waveform';
 import { assetRegistry } from '../media/registry';
 import { Renderer } from '../render/Renderer';
 import { ExactFramePool } from './exactFrames';
@@ -15,6 +16,7 @@ export class OfflineRenderer {
   private media: MediaProvider;
   /** 描画の前に、必要な動画フレームを集めるときの記録先 */
   private requests: { key: string; assetId: string; time: number }[] | null = null;
+  private peaks = new Map<string, Peaks | null>();
 
   constructor(
     private project: Project,
@@ -33,11 +35,21 @@ export class OfflineRenderer {
         return this.frames.get(key);
       },
       assetDuration: (id) => durations.get(id),
+      getPeaks: (id) => this.peaks.get(id) ?? undefined,
     };
   }
 
   async init(): Promise<void> {
     await this.compositor.loadFonts(this.project);
+    // 音声波形オブジェクトがあれば、音声・動画素材の波形データを先に計算しておく
+    const hasWave = this.project.scenes.some((s) => s.objects.some((o) => o.type === 'audioWave'));
+    if (!hasWave) return;
+    const ids = new Set(
+      this.project.scenes.flatMap((s) =>
+        s.objects.filter((o) => o.type === 'audio' || o.type === 'video').map((o) => o.assetId),
+      ),
+    );
+    for (const id of ids) if (id) this.peaks.set(id, await loadPeaks(id));
   }
 
   async render(frame: number): Promise<void> {

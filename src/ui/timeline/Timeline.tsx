@@ -87,6 +87,8 @@ function objectLabel(obj: TimelineObject, assets: Asset[], scenes: Scene[]): str
     const names = obj.effects.map((e) => getEffectDef(e.type)?.label ?? e.type);
     return names.length > 0 ? `フィルタ：${names.join('・')}` : 'フィルタ';
   }
+  if (obj.type === 'audioWave')
+    return `音声波形（レイヤー ${Number(obj.params.targetLayer ?? 1)} の音）`;
   if (obj.type === 'text')
     return String(obj.params.text ?? 'テキスト').split('\n')[0] || 'テキスト';
   if (obj.assetId)
@@ -707,6 +709,18 @@ export function Timeline() {
           }),
       },
       { label: 'フレームバッファを追加（上までの画面を素材にする）', action: add('framebuffer') },
+      {
+        label: '音声波形を追加（音声・動画の音を表示する）',
+        action: () => {
+          // 音のあるオブジェクトのレイヤーを対象にする（なければ 1 つ下のレイヤー）
+          const withSound = currentScene()
+            .objects.filter((o) => o.type === 'audio' || o.type === 'video')
+            .sort((a, b) => Math.abs(a.start - frame) - Math.abs(b.start - frame))[0];
+          addObject('audioWave', layer, frame, {
+            params: { targetLayer: withSound?.layer ?? clampLayer(layer + 1) },
+          });
+        },
+      },
       'separator',
       { label: 'フィルタを追加（上のレイヤー全体にエフェクト）', action: add('filter') },
       { label: '部分フィルタを追加（範囲の中だけエフェクト）', action: add('partialFilter') },

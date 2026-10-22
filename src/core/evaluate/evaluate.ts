@@ -25,6 +25,13 @@ export interface ResolvedEffect {
   params: ResolvedParams;
 }
 
+/** 文字列から 32bit の整数を作る（乱数の種用） */
+function stringHash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
 /**
  * 有効で、種類を知っているエフェクトだけを評価する（新しいバージョンのエフェクトは無視して残す）。
  * domain で映像・音声のどちらのエフェクトを評価するかを選ぶ
@@ -33,12 +40,15 @@ export function resolveEffects(
   effects: EffectInstance[],
   t: number,
   domain: EffectDomain = 'video',
+  fps?: Rational,
 ): ResolvedEffect[] {
   const out: ResolvedEffect[] = [];
   for (const e of effects) {
     const def = getEffectDef(e.type);
     if (!e.enabled || !def || effectDomain(def) !== domain) continue;
-    const params: ResolvedParams = {};
+    // 時間で変わるエフェクト（振動・ノイズなど）のために、時刻と乱数の種も渡す
+    const params: ResolvedParams = { _frame: t, _seed: stringHash(e.id) };
+    if (fps) params._time = framesToSeconds(t, fps);
     for (const p of def.params) params[p.id] = valueAt(e.params[p.id], t, p.default as never);
     out.push({ id: e.id, type: e.type, params });
   }
@@ -155,6 +165,8 @@ export interface VisualItem {
   /** オブジェクト開始からの相対フレーム */
   localFrame: number;
   params: ResolvedParams;
+  /** 音声波形オブジェクトが表示する音（対象のレイヤーにある音声・動画の素材と、その中の時刻） */
+  waveSource?: { assetId: string; time: number; speed: number };
   /** フェードを含めた最終的な不透明度（0〜1） */
   opacity: number;
   /** 動画の場合、表示する素材内の時刻（秒） */
@@ -229,7 +241,7 @@ export function evaluateFrame(scene: Scene, frame: number, ctx: EvaluateContext)
     if (!isActive(object, f)) continue;
     const localFrame = f - object.start;
     const params = resolveParams(object, localFrame);
-    const effects = resolveEffects(object.effects, localFrame);
+    const effects = resolveEffects(object.effects, localFrame, 'video', ctx.fps);
     const localSeconds = framesToSeconds(localFrame, ctx.fps);
     const duration = framesToSeconds(object.length, ctx.fps);
     if (def.control) {
@@ -253,6 +265,29 @@ export function evaluateFrame(scene: Scene, frame: number, ctx: EvaluateContext)
     if (object.type === 'video') {
       const assetDuration = object.assetId ? ctx.assetDuration?.(object.assetId) : undefined;
       item.sourceTime = sourceTimeAt(params, localSeconds, assetDuration);
+    }
+    if (object.type === 'audioWave') {
+      const target = Math.round(Number(params.targetLayer));
+      const tf = frameFor(target);
+      const src = scene.objects.find(
+        (o) =>
+          o.layer === target &&
+          (o.type === 'audio' || o.type === 'video') &&
+          o.assetId !== undefined &&
+          isActive(o, tf),
+      );
+      if (src?.assetId) {
+        const sp = resolveParams(src, tf - src.start);
+        item.waveSource = {
+          assetId: src.assetId,
+          time: sourceTimeAt(
+            sp,
+            framesToSeconds(tf - src.start, ctx.fps),
+            ctx.assetDuration?.(src.assetId),
+          ),
+          speed: Number(sp.speed) / 100,
+        };
+      }
     }
     if (object.type === 'scene') {
       const sceneId = String(params.sceneRef);

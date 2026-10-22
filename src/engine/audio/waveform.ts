@@ -39,6 +39,12 @@ async function compute(assetId: string): Promise<Peaks | null> {
   return { data, rate: PEAK_RATE };
 }
 
+/** 素材の波形データを計算し終わるまで待つ（書き出し用） */
+export async function loadPeaks(assetId: string): Promise<Peaks | null> {
+  peekPeaks(assetId);
+  return (await cache.get(assetId)?.promise) ?? null;
+}
+
 /** 素材の波形データ。まだなければ計算を始めて undefined を返す */
 export function peekPeaks(assetId: string): Peaks | null | undefined {
   let entry = cache.get(assetId);

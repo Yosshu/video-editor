@@ -209,6 +209,75 @@ export function rasterizeSolid(p: ResolvedParams): OffscreenCanvas {
 }
 
 /** オブジェクトごとに直近の描画結果を覚えておき、内容が同じなら使い回す */
+/** 波形の振幅データ（一定間隔ごとの最大値） */
+export interface WavePeaks {
+  data: Float32Array;
+  /** 1 秒あたりの区間数 */
+  rate: number;
+}
+
+/** 素材内の時刻 [from, to)（秒）の振幅の最大値 */
+function peakBetween(peaks: WavePeaks, from: number, to: number): number {
+  const a = Math.max(0, Math.floor(from * peaks.rate));
+  const b = Math.min(peaks.data.length, Math.max(a + 1, Math.ceil(to * peaks.rate)));
+  let m = 0;
+  for (let i = a; i < b; i++) if (peaks.data[i] > m) m = peaks.data[i];
+  return m;
+}
+
+/**
+ * 音声波形を描画する。time は素材内の今の時刻（秒）、speed はその素材の再生速度。
+ * peaks がなければ（読み込み中など）枠の大きさだけの透明な画像にする
+ */
+export function rasterizeWave(
+  p: ResolvedParams,
+  scale: number,
+  peaks: WavePeaks | undefined,
+  time: number,
+  speed: number,
+): Raster {
+  const w = Math.max(1, Number(p.width) * scale);
+  const h = Math.max(1, Number(p.height) * scale);
+  const canvas = createCanvas(w, h);
+  const result = { canvas, width: Number(p.width), height: Number(p.height) };
+  if (!peaks) return result;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = String(p.color);
+  ctx.strokeStyle = String(p.color);
+  const style = String(p.style);
+  const count =
+    style === 'line' ? Math.max(2, Math.round(w / 3)) : Math.max(2, Math.round(Number(p.bars)));
+  // 表示する素材内の区間（再生速度の分だけ広がる）
+  const span = Math.max(0.01, Number(p.window)) * Math.max(0.01, Math.abs(speed));
+  const start = time - (p.align === 'end' ? span : span / 2);
+  const gain = Number(p.sensitivity) / 100;
+  const values = Array.from({ length: count }, (_, i) =>
+    Math.min(
+      1,
+      peakBetween(peaks, start + (span * i) / count, start + (span * (i + 1)) / count) * gain,
+    ),
+  );
+  const step = w / count;
+  if (style === 'line') {
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    values.forEach((v, i) => ctx.lineTo((i + 0.5) * step, h / 2 - (v * h) / 2));
+    ctx.lineTo(w, h / 2);
+    for (let i = count - 1; i >= 0; i--) ctx.lineTo((i + 0.5) * step, h / 2 + (values[i] * h) / 2);
+    ctx.closePath();
+    ctx.fill();
+    return result;
+  }
+  const barW = Math.max(1, step * 0.65);
+  values.forEach((v, i) => {
+    const x = i * step + (step - barW) / 2;
+    const bh = Math.max(scale, v * h);
+    if (style === 'mirror') ctx.fillRect(x, (h - bh) / 2, barW, bh);
+    else ctx.fillRect(x, h - bh, barW, bh);
+  });
+  return result;
+}
+
 export class RasterCache {
   private entries = new Map<string, { key: string; raster: Raster }>();
 

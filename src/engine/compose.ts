@@ -10,7 +10,9 @@ import {
   rasterizeShape,
   rasterizeSolid,
   rasterizeText,
+  rasterizeWave,
   textFont,
+  type WavePeaks,
 } from './objects/raster';
 
 /** 動画の 1 フレーム */
@@ -35,6 +37,8 @@ export interface MediaProvider {
     sourceTime: number,
   ): VideoFrameRef | undefined;
   assetDuration(assetId: string): number | undefined;
+  /** 素材の音声の振幅データ（音声波形オブジェクト用。まだなければ undefined） */
+  getPeaks?(assetId: string): WavePeaks | undefined;
 }
 
 export interface ComposedItem {
@@ -250,6 +254,38 @@ export class Compositor {
         ]);
         ctx.rasterIds.add(id);
         const raster = this.rasters.get(id, key, () => rasterizeShape(p, rs));
+        return {
+          ...base,
+          source: raster.canvas,
+          version: raster,
+          mipmap: true,
+          width: raster.width,
+          height: raster.height,
+        };
+      }
+      case 'audioWave': {
+        const rs = pixelScale * rasterUpscale(Number(p.scale));
+        const src = item.waveSource;
+        const peaks = src ? media.getPeaks?.(src.assetId) : undefined;
+        const key = JSON.stringify([
+          p.style,
+          p.width,
+          p.height,
+          p.bars,
+          p.window,
+          p.align,
+          p.sensitivity,
+          p.color,
+          rs,
+          src?.assetId,
+          src?.time,
+          src?.speed,
+          peaks ? 1 : 0,
+        ]);
+        ctx.rasterIds.add(id);
+        const raster = this.rasters.get(id, key, () =>
+          rasterizeWave(p, rs, peaks, src?.time ?? 0, src?.speed ?? 1),
+        );
         return {
           ...base,
           source: raster.canvas,

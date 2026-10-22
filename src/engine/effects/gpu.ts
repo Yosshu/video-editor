@@ -1,3 +1,4 @@
+import { hash01 } from '../../core/animation/ease';
 import type { ResolvedParams } from '../../core/evaluate/evaluate';
 import { createProgram, parseColor, type Program, type RenderTarget } from '../render/gl';
 import type { RenderTargetPool } from '../render/targetPool';
@@ -282,6 +283,157 @@ void main() {
     f = 1.0 - smoothstep(r - soft * maxR, r, length(p));
   }
   outColor = srcAt(vec2(0.0)) * clamp(f, 0.0, 1.0);
+}`,
+
+  // 入力をずらして写す（振動）
+  shift: `
+uniform vec2 uOffset;
+void main() { outColor = srcAt(-uOffset); }`,
+
+  // ミラー。uDir: 0=右 1=左 2=下 3=上。uExpand=1 なら外側に、0 なら中央を境に反転する
+  mirror: `
+uniform float uDir; uniform float uExpand;
+void main() {
+  vec2 p = outPx() - uPad;
+  vec2 s = uInSize;
+  if (uExpand > 0.5) {
+    if (uDir < 0.5 && p.x > s.x) p.x = 2.0 * s.x - p.x;
+    else if (uDir > 0.5 && uDir < 1.5 && p.x < 0.0) p.x = -p.x;
+    else if (uDir > 1.5 && uDir < 2.5 && p.y > s.y) p.y = 2.0 * s.y - p.y;
+    else if (uDir > 2.5 && p.y < 0.0) p.y = -p.y;
+  } else {
+    if (uDir < 0.5 && p.x > s.x * 0.5) p.x = s.x - p.x;
+    else if (uDir > 0.5 && uDir < 1.5 && p.x < s.x * 0.5) p.x = s.x - p.x;
+    else if (uDir > 1.5 && uDir < 2.5 && p.y > s.y * 0.5) p.y = s.y - p.y;
+    else if (uDir > 2.5 && p.y < s.y * 0.5) p.y = s.y - p.y;
+  }
+  outColor = srcPx(p);
+}`,
+
+  wave: `
+uniform float uAmp; uniform float uLength; uniform float uPhase; uniform float uVertical;
+void main() {
+  vec2 p = outPx() - uPad;
+  float t = 6.2831853 * (uVertical > 0.5 ? p.x : p.y) / uLength + uPhase;
+  vec2 d = uVertical > 0.5 ? vec2(0.0, uAmp * sin(t)) : vec2(uAmp * sin(t), 0.0);
+  outColor = srcPx(p - d);
+}`,
+
+  // 極座標変換：横方向を角度、縦方向を中心からの距離にする
+  polar: `
+uniform float uRotation; uniform float uBottom;
+void main() {
+  vec2 c = uOutSize * 0.5;
+  vec2 d = outPx() - c;
+  float R = min(uOutSize.x, uOutSize.y) * 0.5;
+  float r = length(d);
+  if (r > R) { outColor = vec4(0.0); return; }
+  float a = atan(d.x, -d.y) + uRotation;
+  float u = fract(a / 6.2831853);
+  float v = r / R;
+  if (uBottom > 0.5) v = 1.0 - v;
+  outColor = srcPx(vec2(u, v) * uInSize);
+}`,
+
+  // ゆがみ。uKind: 0=膨らみ 1=へこみ 2=渦巻き
+  displace: `
+uniform float uKind; uniform vec2 uCenter; uniform float uRadius; uniform float uStrength;
+void main() {
+  vec2 p = outPx() - uPad;
+  vec2 c = uInSize * 0.5 + uCenter;
+  vec2 d = p - c;
+  float r = length(d);
+  if (r < uRadius && r > 0.0) {
+    float t = r / uRadius;
+    if (uKind < 1.5) {
+      float k = uKind < 0.5 ? uStrength : -uStrength;
+      float e = k >= 0.0 ? 1.0 + k * 2.0 : 1.0 / (1.0 - k * 2.0);
+      p = c + d / r * pow(t, e) * uRadius;
+    } else {
+      float a = uStrength * 6.2831853 * (1.0 - t) * (1.0 - t);
+      float ca = cos(a); float sa = sin(a);
+      p = c + vec2(d.x * ca - d.y * sa, d.x * sa + d.y * ca);
+    }
+  }
+  outColor = srcPx(p);
+}`,
+
+  // 画像を並べる。uScale は出力 1px あたりの入力の px
+  tile: `
+uniform vec2 uOffset; uniform vec2 uScale;
+void main() {
+  vec2 p = mod(outPx() * uScale - uOffset, uInSize);
+  outColor = srcPx(clamp(p, vec2(0.5), uInSize - 0.5));
+}`,
+
+  light: `
+uniform vec2 uCenter; uniform float uRadius; uniform float uIntensity; uniform vec3 uColor;
+void main() {
+  vec4 c = srcAt(vec2(0.0));
+  vec2 p = outPx() - uPad;
+  float d = distance(p, uInSize * 0.5 + uCenter);
+  float f = pow(1.0 - clamp(d / uRadius, 0.0, 1.0), 2.0) * uIntensity;
+  outColor = vec4(min(c.rgb + uColor * f * c.a, vec3(c.a)), c.a);
+}`,
+
+  directionalBlur: `
+uniform vec2 uDir; uniform float uLength;
+void main() {
+  int n = int(clamp(ceil(uLength), 1.0, 64.0));
+  if (n < 2) { outColor = srcAt(vec2(0.0)); return; }
+  vec4 sum = vec4(0.0);
+  for (int i = 0; i < 64; i++) {
+    if (i >= n) break;
+    sum += srcAt(uDir * (float(i) / float(n - 1) - 0.5) * uLength);
+  }
+  outColor = sum / float(n);
+}`,
+
+  radialBlur: `
+uniform vec2 uCenter; uniform float uStrength;
+void main() {
+  vec2 p = outPx() - uPad;
+  vec2 c = uInSize * 0.5 + uCenter;
+  vec4 sum = vec4(0.0);
+  for (int i = 0; i < 32; i++) {
+    float s = 1.0 - uStrength * float(i) / 31.0;
+    sum += srcPx(c + (p - c) * s);
+  }
+  outColor = sum / 32.0;
+}`,
+
+  noise: `
+uniform float uAmount; uniform float uSize; uniform float uColored; uniform float uSeed;
+float rnd(vec2 v, float k) { return fract(sin(dot(v, vec2(12.9898, 78.233)) + uSeed + k * 17.13) * 43758.5453); }
+void main() {
+  vec4 c = srcAt(vec2(0.0));
+  if (c.a <= 0.0) { outColor = c; return; }
+  vec2 cell = floor((outPx() - uPad) / uSize);
+  vec3 n = uColored > 0.5
+    ? vec3(rnd(cell, 1.0), rnd(cell, 2.0), rnd(cell, 3.0))
+    : vec3(rnd(cell, 1.0));
+  vec3 rgb = clamp(unpremul(c) + (n * 2.0 - 1.0) * uAmount, 0.0, 1.0);
+  outColor = vec4(rgb * c.a, c.a);
+}`,
+
+  chromaticShift: `
+uniform vec2 uOffset;
+void main() {
+  vec4 r = srcAt(uOffset);
+  vec4 g = srcAt(vec2(0.0));
+  vec4 b = srcAt(-uOffset);
+  outColor = vec4(r.r, g.g, b.b, max(max(r.a, g.a), b.a));
+}`,
+
+  diagonalClip: `
+uniform vec2 uCenter; uniform vec2 uNormal; uniform float uWidth; uniform float uFeather;
+void main() {
+  vec2 p = outPx() - uPad - (uInSize * 0.5 + uCenter);
+  float d = dot(p, uNormal);
+  // 幅が 0 なら直線の片側だけ、幅があれば直線を中心にその幅だけ残す
+  float e = uWidth > 0.0 ? abs(d) - uWidth * 0.5 : d;
+  float f = uFeather > 0.0 ? clamp(0.5 - e / uFeather, 0.0, 1.0) : (e <= 0.0 ? 1.0 : 0.0);
+  outColor = srcAt(vec2(0.0)) * f;
 }`,
 };
 
@@ -590,6 +742,168 @@ export const EFFECT_IMPLS: Record<string, EffectApply> = {
       uSoftness: n(p.softness) / 100,
       uBright: p.mode === 'bright' ? 1 : 0,
     }),
+
+  mirror: (r, input, p, res, expand) => {
+    const dir = ['right', 'left', 'bottom', 'top'].indexOf(String(p.direction));
+    const horizontal = dir < 2;
+    const W = input.target.width;
+    const H = input.target.height;
+    // 元の画像が中央に残るよう、反転した側と反対側にも同じだけ余白を足す
+    const pad: [number, number] = expand ? (horizontal ? [W, 0] : [0, H]) : [0, 0];
+    const out = r.pass(
+      'mirror',
+      input.target,
+      W + pad[0] * 2,
+      H + pad[1] * 2,
+      { uDir: Math.max(0, dir), uExpand: expand ? 1 : 0 },
+      pad,
+    );
+    return {
+      target: out,
+      width: input.width + (pad[0] * 2) / res,
+      height: input.height + (pad[1] * 2) / res,
+    };
+  },
+
+  vibrate: (r, input, p, res, expand) => {
+    const interval = Math.max(1, Math.round(n(p.interval)));
+    const step = Math.floor(n(p._frame) / interval);
+    const seed = n(p._seed);
+    const ax = n(p.amountX) * res;
+    const ay = n(p.amountY) * res;
+    const dx = (hash01(seed, step * 2) * 2 - 1) * ax;
+    const dy = (hash01(seed, step * 2 + 1) * 2 - 1) * ay;
+    const pad = expand ? Math.ceil(Math.max(ax, ay)) : 0;
+    const out = r.pass(
+      'shift',
+      input.target,
+      input.target.width + pad * 2,
+      input.target.height + pad * 2,
+      { uOffset: [dx, dy] },
+      [pad, pad],
+    );
+    return grown(input, out, pad, res);
+  },
+
+  wave: (r, input, p, res, expand) => {
+    const amp = n(p.amplitude) * res;
+    const pad = expand ? Math.ceil(amp) : 0;
+    const out = r.pass(
+      'wave',
+      input.target,
+      input.target.width + pad * 2,
+      input.target.height + pad * 2,
+      {
+        uAmp: amp,
+        uLength: Math.max(1, n(p.wavelength) * res),
+        uPhase: n(p._time) * n(p.speed) * 2 * Math.PI,
+        uVertical: p.direction === 'vertical' ? 1 : 0,
+      },
+      [pad, pad],
+    );
+    return grown(input, out, pad, res);
+  },
+
+  polar: (r, input, p, res, expand) => {
+    // 広げられるときは、縦の長さを半径とする円が入る正方形にする
+    const size = expand ? Math.min(8192, Math.max(1, Math.round(input.target.height * 2))) : 0;
+    const w = expand ? size : input.target.width;
+    const h = expand ? size : input.target.height;
+    const out = r.pass('polar', input.target, w, h, {
+      uRotation: (n(p.rotation) * Math.PI) / 180,
+      uBottom: p.center === 'bottom' ? 1 : 0,
+    });
+    return expand
+      ? { target: out, width: size / res, height: size / res }
+      : { target: out, width: input.width, height: input.height };
+  },
+
+  displace: (r, input, p, res) =>
+    same(r, input, 'displace', {
+      uKind: ['bulge', 'pinch', 'twirl'].indexOf(String(p.kind)),
+      uCenter: [n(p.x) * res, n(p.y) * res],
+      uRadius: Math.max(1, n(p.radius) * res),
+      uStrength: n(p.strength) / 100,
+    }),
+
+  tile: (r, input, p, res, expand) => {
+    const W = input.target.width;
+    const H = input.target.height;
+    // 描画先が大きくなりすぎないよう、並べる数を抑える
+    const cx = Math.max(1, Math.min(Math.round(n(p.countX)), Math.floor(8192 / Math.max(1, W))));
+    const cy = Math.max(1, Math.min(Math.round(n(p.countY)), Math.floor(8192 / Math.max(1, H))));
+    const offset: [number, number] = [n(p.offsetX) * res, n(p.offsetY) * res];
+    if (expand) {
+      const out = r.pass('tile', input.target, W * cx, H * cy, { uOffset: offset, uScale: [1, 1] });
+      return { target: out, width: input.width * cx, height: input.height * cy };
+    }
+    // フィルタでは画面の大きさのまま、小さくして並べる
+    return same(r, input, 'tile', { uOffset: offset, uScale: [cx, cy] });
+  },
+
+  light: (r, input, p, res) =>
+    same(r, input, 'light', {
+      uCenter: [n(p.x) * res, n(p.y) * res],
+      uRadius: Math.max(1, n(p.radius) * res),
+      uIntensity: n(p.intensity) / 100,
+      uColor: parseColor(String(p.color)),
+    }),
+
+  directionalBlur: (r, input, p, res, expand) => {
+    const length = n(p.length) * res;
+    const a = (n(p.angle) * Math.PI) / 180;
+    const pad = expand ? Math.ceil(length / 2) : 0;
+    const out = r.pass(
+      'directionalBlur',
+      input.target,
+      input.target.width + pad * 2,
+      input.target.height + pad * 2,
+      { uDir: [Math.cos(a), Math.sin(a)], uLength: length },
+      [pad, pad],
+    );
+    return grown(input, out, pad, res);
+  },
+
+  radialBlur: (r, input, p, res) =>
+    same(r, input, 'radialBlur', {
+      uCenter: [n(p.x) * res, n(p.y) * res],
+      uStrength: Math.min(1, Math.max(0, n(p.strength) / 100)),
+    }),
+
+  noise: (r, input, p, res) =>
+    same(r, input, 'noise', {
+      uAmount: n(p.amount) / 100,
+      uSize: Math.max(1, n(p.size) * res),
+      uColored: p.colored ? 1 : 0,
+      // 乱数の種：フレームごとに変える場合は時刻も混ぜる
+      uSeed: ((n(p._seed) % 997) + (p.animated === false ? 0 : n(p._frame) * 1.618)) % 997,
+    }),
+
+  chromaticShift: (r, input, p, res, expand) => {
+    const off = n(p.offset) * res;
+    const a = (n(p.angle) * Math.PI) / 180;
+    const pad = expand ? Math.ceil(off) : 0;
+    const out = r.pass(
+      'chromaticShift',
+      input.target,
+      input.target.width + pad * 2,
+      input.target.height + pad * 2,
+      { uOffset: [Math.cos(a) * off, Math.sin(a) * off] },
+      [pad, pad],
+    );
+    return grown(input, out, pad, res);
+  },
+
+  diagonalClip: (r, input, p, res) => {
+    // 角度 0 で、縦の直線の右側を消す
+    const a = (n(p.angle) * Math.PI) / 180;
+    return same(r, input, 'diagonalClip', {
+      uCenter: [n(p.x) * res, n(p.y) * res],
+      uNormal: [Math.cos(a), Math.sin(a)],
+      uWidth: n(p.width) * res,
+      uFeather: n(p.feather) * res,
+    });
+  },
 
   // 登場・退場のワイプ（内部用）
   wipe: (r, input, p) =>

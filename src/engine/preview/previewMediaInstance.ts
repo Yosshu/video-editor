@@ -1,6 +1,7 @@
 import { getState } from '../../state/store';
 import { AudioPlayer } from '../audio/AudioPlayer';
 import { AudioReaderPool } from '../audio/sources';
+import { onPeaksChange } from '../audio/waveform';
 import type { MediaProvider } from '../compose';
 import { assetRegistry } from '../media/registry';
 import { VideoFramePool } from '../media/videoFrames';
@@ -32,6 +33,8 @@ function init() {
     new AudioReaderPool((id) => assetRegistry.getMedia(id), assetDuration),
   );
   playback.setAudio(audio);
+  // 音声波形オブジェクトのため、波形データができたら描き直す
+  onPeaksChange(() => frameListeners.forEach((l) => l()));
   instance = { media, video, audio };
   return instance;
 }

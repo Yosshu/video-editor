@@ -64,6 +64,7 @@ const objectSchema = z
       'timeControl',
       'partialFilter',
       'camera',
+      'audioWave',
     ]),
     layer: z.number().int().min(1).max(10_000),
     start: z.number().int().min(0),
