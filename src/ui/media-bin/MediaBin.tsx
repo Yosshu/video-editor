@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { addAssetObjects } from '../../app/actions';
 import {
   collectDroppedFiles,
-  importMediaFiles,
+  importDroppedFiles,
   replaceAssetFile,
   type IncomingFile,
 } from '../../app/assets';
@@ -92,7 +92,7 @@ export function MediaBin() {
     if (files.length === 0) return;
     setBusy(true);
     try {
-      await importMediaFiles(files);
+      await importDroppedFiles(files);
     } finally {
       setBusy(false);
     }

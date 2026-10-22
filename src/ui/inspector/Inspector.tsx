@@ -798,7 +798,7 @@ function ObjectInspector({ obj }: { obj: TimelineObject }) {
             {(obj.length / fpsValue(fps)).toFixed(2)} {t('秒')}
           </span>
           <span>{t('レイヤー')}</span>
-          <span>{obj.layer}</span>
+          <span data-testid="inspector-layer">{obj.layer}</span>
           <span />
         </div>
       </details>

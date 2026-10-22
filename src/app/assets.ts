@@ -2,6 +2,8 @@ import type { Asset, Project } from '../core/model/types';
 import { computeFingerprint } from '../engine/media/fingerprint';
 import { AssetImportError, assetRegistry } from '../engine/media/registry';
 import { encodeImageSequence } from '../engine/media/sequence';
+import { isSubtitleFileName } from '../core/subtitles/subtitles';
+import { importSubtitles } from './subtitleActions';
 import { idbGet, idbSet } from '../storage/idb';
 import { commit, getState, notify, setAssetStatus } from '../state/store';
 import { useUi } from '../state/ui';
@@ -125,6 +127,14 @@ export async function importMediaFiles(files: IncomingFile[]): Promise<Asset[]> 
     }
   }
   return result;
+}
+
+/** 素材一覧などに投下されたファイルを取り込む。字幕ファイルは再生位置からタイムラインに置く */
+export async function importDroppedFiles(files: IncomingFile[]): Promise<Asset[]> {
+  for (const { file } of files.filter((f) => isSubtitleFileName(f.file.name))) {
+    await importSubtitles(file, 1, getState().playhead);
+  }
+  return importMediaFiles(files.filter((f) => !isSubtitleFileName(f.file.name)));
 }
 
 /** 読み込んだ編集ファイルの素材を、ブラウザに保存されたファイルハンドルから復元する。戻り値は見つからなかった素材 */

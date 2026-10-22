@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
+import { collectDroppedFiles, importDroppedFiles } from '../../app/assets';
 import { checkAutosave, openProjectFile, startAutosave } from '../../app/projectFile';
 import { isProjectFileName } from '../../engine/media/detect';
 import { setupPreviewAudio } from '../../engine/preview/previewMediaInstance';
@@ -77,11 +77,11 @@ export function Editor() {
         setDragOver(false);
         if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
-        // どこにも受け取られなかったファイル：編集ファイルなら開き、素材なら素材一覧に追加
+        // どこにも受け取られなかったファイル：編集ファイルなら開き、素材なら素材一覧に追加（字幕はタイムラインへ）
         void collectDroppedFiles(e.dataTransfer).then(async (files) => {
           const project = files.find((f) => isProjectFileName(f.file.name));
           if (project) await openProjectFile(project.file, project.handle);
-          else await importMediaFiles(files);
+          else await importDroppedFiles(files);
         });
       }}
     >

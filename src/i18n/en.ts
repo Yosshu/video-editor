@@ -844,4 +844,10 @@ export const EN: Record<string, string> = {
   '名前に番号の付いた画像を、1 本の動画としてまとめて読み込みます':
     'Import numbered images together as one video',
   '連番画像…': 'Image sequence…',
+  '「{0}」から字幕を読み取れませんでした。': 'Couldn\'t read subtitles from "{0}".',
+  字幕の読み込み: 'Import subtitles',
+  '空いているレイヤーがないため、{0} 個の字幕を置けませんでした。':
+    "{0} subtitles couldn't be placed because there are no free layers.",
+  '{0} 個の字幕を読み込みました。': 'Imported {0} subtitles.',
+  '字幕ファイル（SRT・WebVTT）を読み込む…': 'Import subtitle file (SRT/WebVTT)…',
 };

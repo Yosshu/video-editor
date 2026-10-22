@@ -26,6 +26,8 @@ import {
 import { referableScenes } from '../../app/sceneActions';
 import { sceneObjectLength } from '../../engine/compose';
 import { collectDroppedFiles, importMediaFiles } from '../../app/assets';
+import { importSubtitles } from '../../app/subtitleActions';
+import { isSubtitleFileName, SUBTITLE_ACCEPT } from '../../core/subtitles/subtitles';
 import { objectKeyTimes } from '../../core/animation/keys';
 import { openProjectFile } from '../../app/projectFile';
 import { framesToSeconds, secondsToFrames } from '../../core/model/time';
@@ -767,6 +769,13 @@ export function Timeline() {
           addAssetObjects(imported, layer, frame);
         },
       },
+      {
+        label: t('字幕ファイル（SRT・WebVTT）を読み込む…'),
+        action: async () => {
+          const [file] = await pickFilesWithInput({ accept: SUBTITLE_ACCEPT });
+          if (file) await importSubtitles(file, layer, frame);
+        },
+      },
       'separator',
       {
         label: t('空白を詰める（このレイヤー）'),
@@ -821,7 +830,12 @@ export function Timeline() {
         await openProjectFile(project.file, project.handle);
         return;
       }
-      const imported = await importMediaFiles(files);
+      for (const f of files.filter((f) => isSubtitleFileName(f.file.name))) {
+        await importSubtitles(f.file, layer, frame);
+      }
+      const media = files.filter((f) => !isSubtitleFileName(f.file.name));
+      if (media.length === 0) return;
+      const imported = await importMediaFiles(media);
       addAssetObjects(imported, layer, frame);
     });
   };
