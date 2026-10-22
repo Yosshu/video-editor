@@ -24,9 +24,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      # デフォルトブランチへの push のときだけ公開用の成果物を作る
+      # main への push（または main での手動実行）のときだけ公開用の成果物を作る
       - name: Pages 用の成果物をアップロード
-        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v4
         with:
           path: dist
@@ -50,10 +50,11 @@ jobs:
           path: test-results
           retention-days: 7
 
+  # 公開は main からだけ行う。作業用ブランチではこのジョブはスキップされる
   deploy:
     name: GitHub Pages へデプロイ
     needs: check
-    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       pages: write
