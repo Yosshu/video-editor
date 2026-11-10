@@ -9,6 +9,7 @@ import type {
   TextParamDef,
 } from '../../core/params/defs';
 import { clampNumber } from '../../core/params/defs';
+import { groupUntilPointerUp } from '../common/gesture';
 import { t } from '../../i18n';
 
 const COMMON_FONTS = [
@@ -54,7 +55,9 @@ export function NumberField({
 }: FieldProps<NumberParamDef, number>) {
   const id = useId();
   const [text, setText] = useState<string | null>(null);
-  const dragRef = useRef<{ x: number; value: number } | null>(null);
+  const dragRef = useRef<{ x: number; value: number; moved: boolean } | null>(null);
+  /** 直前の操作がドラッグだったか（クリックで入力欄へ移るのを止めるため） */
+  const moved = useRef(false);
   const sliderMin = def.sliderMin ?? def.min;
   const sliderMax = def.sliderMax ?? def.max;
   const range = sliderMin !== undefined && sliderMax !== undefined ? sliderMax - sliderMin : 1000;
@@ -75,16 +78,26 @@ export function NumberField({
           onPointerDown={(e) => {
             if (disabled || e.button !== 0) return;
             e.currentTarget.setPointerCapture(e.pointerId);
-            dragRef.current = { x: e.clientX, value };
+            groupUntilPointerUp();
+            dragRef.current = { x: e.clientX, value, moved: false };
           }}
           onPointerMove={(e) => {
             const d = dragRef.current;
             if (!d) return;
             const factor = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
+            if (Math.abs(e.clientX - d.x) > 2) d.moved = true;
             commit(d.value + (e.clientX - d.x) * perPx * factor);
           }}
-          onPointerUp={() => (dragRef.current = null)}
+          onPointerUp={() => {
+            moved.current = dragRef.current?.moved ?? false;
+            dragRef.current = null;
+          }}
           onPointerCancel={() => (dragRef.current = null)}
+          onClick={(e) => {
+            // ドラッグした後は入力欄へ移らない（続けて Ctrl+Z で元に戻せるように）
+            if (moved.current) e.preventDefault();
+            moved.current = false;
+          }}
         >
           {t(def.label)}
         </label>
@@ -100,6 +113,8 @@ export function NumberField({
             step={def.step ?? 1}
             value={Math.min(sliderMax, Math.max(sliderMin, value))}
             disabled={disabled}
+            // スライダーをドラッグしている間の変更は 1 つの操作にまとめる
+            onPointerDown={(e) => e.button === 0 && groupUntilPointerUp()}
             onChange={(e) => commit(Number(e.target.value))}
           />
         )}

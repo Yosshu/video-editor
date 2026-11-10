@@ -87,6 +87,22 @@ export function replaceProject(project: Project, fileName: string | null): void 
   });
 }
 
+/** ドラッグなど 1 つの操作の途中か（その間の変更は 1 つの履歴にまとめる） */
+let gesture: number | null = null;
+let gestureSeq = 0;
+
+/**
+ * 1 つの操作を始める。endGesture までの変更は、何回に分けて行っても（別々のパラメータでも、
+ * 時間がかかっても）1 つの履歴にまとめ、元に戻す・やり直すで一度に戻る
+ */
+export function beginGesture(): void {
+  gesture = ++gestureSeq;
+}
+
+export function endGesture(): void {
+  gesture = null;
+}
+
 /**
  * プロジェクトを変更する。すべての編集はこの関数を通す（元に戻せるようにするため）。
  */
@@ -101,11 +117,12 @@ export function commit(
   const now = Date.now();
   const past = [...state.past];
   const last = past[past.length - 1];
+  const mergeKey = gesture !== null ? `gesture:${gesture}` : options.mergeKey;
   if (
-    options.mergeKey &&
+    mergeKey &&
     last &&
-    last.mergeKey === options.mergeKey &&
-    now - last.time < MERGE_WINDOW_MS
+    last.mergeKey === mergeKey &&
+    (gesture !== null || now - last.time < MERGE_WINDOW_MS)
   ) {
     past[past.length - 1] = {
       ...last,
@@ -114,7 +131,7 @@ export function commit(
       time: now,
     };
   } else {
-    past.push({ label, patches, inverse, mergeKey: options.mergeKey, time: now });
+    past.push({ label, patches, inverse, mergeKey, time: now });
     if (past.length > HISTORY_LIMIT) past.shift();
   }
   useEditor.setState({ project: next, past, future: [], dirty: true });

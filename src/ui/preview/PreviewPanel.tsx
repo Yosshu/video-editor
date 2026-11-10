@@ -13,6 +13,7 @@ import {
   type PreviewQuality,
 } from '../../state/store';
 import { useUi } from '../../state/ui';
+import { groupUntilPointerUp } from '../common/gesture';
 import { FULLSCREEN_ATTR } from './fullscreen';
 import { TransportBar } from './TransportBar';
 import { t } from '../../i18n';
@@ -115,9 +116,10 @@ export function PreviewPanel() {
     (y / sceneH + 0.5) * displayH,
   ];
 
-  /** ドラッグ操作の共通処理 */
+  /** ドラッグ操作の共通処理（ドラッグ全体を 1 つの操作として履歴に残す） */
   const track = (target: Element, pointerId: number, onMove: (ev: PointerEvent) => void) => {
     target.setPointerCapture(pointerId);
+    groupUntilPointerUp();
     const up = () => {
       target.removeEventListener('pointermove', onMove as EventListener);
       target.removeEventListener('pointerup', up);

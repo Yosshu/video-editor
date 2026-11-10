@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { applyEase } from '../../core/animation/ease';
 import type { Ease } from '../../core/model/types';
+import { groupUntilPointerUp } from '../common/gesture';
 import { t } from '../../i18n';
 
 const SIZE = 140;
@@ -35,6 +36,7 @@ export function EaseEditor({ ease, onChange }: Props) {
     const svg = ref.current;
     if (!svg) return;
     e.currentTarget.setPointerCapture(e.pointerId);
+    groupUntilPointerUp();
     const start = [...bezier] as [number, number, number, number];
     const move = (ev: PointerEvent) => {
       const rect = svg.getBoundingClientRect();
