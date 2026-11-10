@@ -889,4 +889,5 @@ export const EN: Record<string, string> = {
   '再生中は描画が間に合うよう解像度を下げます（今：{0}）':
     'Lowers the resolution during playback so drawing keeps up (now: {0})',
   自動: 'Auto',
+  ドロップして読み込む: 'Drop to import',
 };

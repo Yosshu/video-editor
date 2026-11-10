@@ -189,7 +189,7 @@ textarea {
 }
 
 .editor.window-drag-over::after {
-  content: 'ドロップして読み込む';
+  content: attr(data-drop-label);
   position: fixed;
   inset: 8px;
   border: 2px dashed var(--accent);

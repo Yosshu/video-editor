@@ -61,6 +61,7 @@ export function Editor() {
   return (
     <div
       className={`editor ${dragOver ? 'window-drag-over' : ''}`}
+      data-drop-label={t('ドロップして読み込む')}
       style={{
         gridTemplateColumns: `${leftW}px 5px minmax(200px, 1fr) 5px ${rightW}px`,
         gridTemplateRows: `auto minmax(120px, 1fr) 5px ${timelineH}px`,
@@ -71,10 +72,13 @@ export function Editor() {
         setDragOver(true);
       }}
       onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setDragOver(false);
+        // 行き先がエディタの外（ウィンドウの外など）のときだけ消す
+        const next = e.relatedTarget;
+        if (!(next instanceof Node) || !e.currentTarget.contains(next)) setDragOver(false);
       }}
+      // 素材一覧やタイムラインが受け取ったときも消えるよう、先に（キャプチャで）処理する
+      onDropCapture={() => setDragOver(false)}
       onDrop={(e) => {
-        setDragOver(false);
         if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
         // どこにも受け取られなかったファイル：編集ファイルなら開き、素材なら素材一覧に追加（字幕はタイムラインへ）
