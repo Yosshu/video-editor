@@ -169,6 +169,7 @@
   - 登場・退場：`enterType` `exitType`（`fade` `slideLeft` `zoom` `wipeLeft` `circle` など）、`enterDuration` `exitDuration`（秒）
   - フェード：`fadeIn` `fadeOut`（秒）
   - 動画・音声：`offset`（素材の再生開始位置、秒）、`speed`（%）、`loop`、`keepPitch`（速度を変えても音程を保つ）、`volume`（%）、`pan`（-100〜100）
+    - 設定パネルで `speed` を変えると、素材の同じ範囲を再生するようにオブジェクトの長さも変わる（200% で半分の長さ）。遅くして伸びるときは、同じレイヤーの次のオブジェクトの手前までにする（同じレイヤーの同じ時刻に置けるオブジェクトは 1 つだけのため）。`loop` が有効なときは長さを変えない。シーンオブジェクトと、ループ再生を切ったアニメーション画像も同じ
   - 画像：アニメーション画像のとき `speed`（%）、`loop` を使う
   - テキスト：`text` `font` `size` `color` `bold` `italic` `align` `lineHeight` `letterSpacing` `outlineWidth` `outlineColor` `shadow` `typeSpeed`（1 文字ずつ表示）など
   - 図形：`shape` `width` `height` `color` `strokeWidth` `cornerRadius` `starInner`

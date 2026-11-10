@@ -890,4 +890,6 @@ export const EN: Record<string, string> = {
     'Lowers the resolution during playback so drawing keeps up (now: {0})',
   自動: 'Auto',
   ドロップして読み込む: 'Drop to import',
+  '同じレイヤーの次のオブジェクトの手前までの長さにしました。':
+    'Shortened to end just before the next object on the same layer.',
 };
