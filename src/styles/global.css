@@ -772,6 +772,22 @@ textarea {
     inset -6px 0 0 -4px rgb(255 255 255 / 25%);
 }
 
+/* 端の部分：ドラッグで開始・終了位置（長さ）を変える */
+.tl-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 1;
+}
+.tl-edge.start {
+  left: 0;
+}
+.tl-edge.end {
+  right: 0;
+}
+
 .tl-object.selected {
   border: 2px solid #fff;
 }
@@ -1151,7 +1167,8 @@ kbd {
   border: 1px solid #000;
   transform: rotate(45deg);
   cursor: ew-resize;
-  z-index: 1;
+  /* 端の部分（.tl-edge）より手前にして、端の近くの中間点もつかめるようにする */
+  z-index: 2;
 }
 
 .handles .handle {

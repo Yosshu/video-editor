@@ -167,6 +167,12 @@ const ObjectItem = memo(function ObjectItem({
         />
       )}
       <span className="tl-object-label">{label}</span>
+      {!locked && !ghost && width > EDGE_PX * 3 && (
+        <>
+          <span className="tl-edge start" data-edge="start" aria-hidden="true" />
+          <span className="tl-edge end" data-edge="end" aria-hidden="true" />
+        </>
+      )}
       {!ghost &&
         width > 24 &&
         objectKeyTimes(obj)
@@ -497,7 +503,7 @@ export function Timeline() {
     };
   };
 
-  const startObjectDrag = (e: React.PointerEvent, obj: TimelineObject, el: HTMLElement) => {
+  const startObjectDrag = (e: React.PointerEvent, obj: TimelineObject) => {
     const state = getState();
     const multi = e.shiftKey || e.ctrlKey || e.metaKey;
     const wasSelected = state.selection.includes(obj.id);
@@ -505,14 +511,10 @@ export function Timeline() {
     const ids = wasSelected || multi ? [...new Set([...state.selection, obj.id])] : [obj.id];
     if (lockedLayers.has(obj.layer)) return;
 
-    const rect = el.getBoundingClientRect();
-    const localX = e.clientX - rect.left;
+    // 端の部分（カーソルが左右の矢印になる所）なら長さの変更、それ以外は移動
+    const edge = (e.target as Element).closest<HTMLElement>('.tl-edge')?.dataset.edge;
     const mode: 'move' | 'start' | 'end' =
-      rect.width > EDGE_PX * 3 && localX < EDGE_PX
-        ? 'start'
-        : rect.width > EDGE_PX * 3 && localX > rect.width - EDGE_PX
-          ? 'end'
-          : 'move';
+      edge === 'start' ? 'start' : edge === 'end' ? 'end' : 'move';
     const origin = locate(e.clientX, e.clientY);
     const sc = currentScene(state);
     const movingIds =
@@ -529,6 +531,8 @@ export function Timeline() {
 
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
+    // 長さの変更中は、端から外れても左右の矢印のままにする
+    if (mode !== 'move') target.style.cursor = 'ew-resize';
     const move = (ev: PointerEvent) => {
       const p = locate(ev.clientX, ev.clientY);
       if (!dragged && Math.abs(p.x - origin.x) < 3 && Math.abs(p.y - origin.y) < 3) return;
@@ -580,6 +584,7 @@ export function Timeline() {
     const up = (ev: PointerEvent) => {
       target.removeEventListener('pointermove', move);
       target.removeEventListener('pointerup', up);
+      target.style.cursor = '';
       target.removeEventListener('pointercancel', up);
       setGhost(null);
       if (!dragged) {
@@ -636,7 +641,7 @@ export function Timeline() {
     const objEl = (e.target as HTMLElement).closest<HTMLElement>('[data-object-id]');
     if (objEl) {
       const obj = scene.objects.find((o) => o.id === objEl.dataset.objectId);
-      if (obj) startObjectDrag(e, obj, objEl);
+      if (obj) startObjectDrag(e, obj);
       return;
     }
     // 空いている場所：クリックで再生位置を移動、ドラッグで範囲選択
