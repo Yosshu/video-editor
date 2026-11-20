@@ -35,6 +35,9 @@ const MAX_DEPTH = 8;
 
 export type StereoPcm = [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>];
 
+/** これより速い再生速度（倍）では音を出さない（聞き取れず、雑音になるため） */
+export const MAX_AUDIBLE_SPEED = 4;
+
 /** 音量・パンの計算をまとめて行う単位（サンプル数） */
 const BLOCK = 128;
 
@@ -107,6 +110,7 @@ async function renderObject(
   const loop = p.loop === true;
   const fadeIn = typeof p.fadeIn === 'number' ? p.fadeIn : 0;
   const fadeOut = typeof p.fadeOut === 'number' ? p.fadeOut : 0;
+  if (speed > MAX_AUDIBLE_SPEED) return { l, r, i0: 0, i1: 0 };
   const objDuration = src.end - src.start;
   // 音量・パンはキーフレームや式で変わるので、フレームごとに評価して使い回す
   let cachedFrame = Number.NaN;
@@ -156,14 +160,28 @@ async function renderObject(
     }
     for (const [a, b, srcStart] of segments) {
       const srcEnd = srcStart + ((b - a) / sr) * speed;
-      const span = await reader.read(Math.max(0, srcStart - 2 / sr), srcEnd + 2 / sr);
+      const margin = (2 + speed) / sr;
+      const span = await reader.read(Math.max(0, srcStart - margin), srcEnd + margin);
       const L = span.channels[0];
       const R = span.channels[1] ?? span.channels[0];
       const srcRate = span.sampleRate;
+      // 出力 1 サンプルあたりに進む素材のサンプル数。1 より多いと間引くことになるので、
+      // その幅の平均をとって高い音を落とし、雑音（折り返し）を防ぐ
+      const step = (speed * srcRate) / sr;
+      const sumL = step > 1 ? prefixSum(L) : null;
+      const sumR = step > 1 ? (R === L ? sumL : prefixSum(R)) : null;
+      const half = step / 2;
       for (let i = a; i < b; i++) {
         const pos = (srcStart + ((i - a) / sr) * speed - span.start) * srcRate;
         const idx = Math.floor(pos);
         if (idx < 0 || idx >= L.length) continue;
+        if (sumL && sumR) {
+          const lo = Math.max(0, Math.round(pos - half));
+          const hi = Math.min(L.length, Math.max(lo + 1, Math.round(pos + half)));
+          l[i] = (sumL[hi] - sumL[lo]) / (hi - lo);
+          r[i] = (sumR[hi] - sumR[lo]) / (hi - lo);
+          continue;
+        }
         const frac = pos - idx;
         const next = Math.min(idx + 1, L.length - 1);
         l[i] = L[idx] + (L[next] - L[idx]) * frac;
@@ -188,6 +206,13 @@ async function renderObject(
     }
   }
   return { l, r, i0, i1 };
+}
+
+/** 累積和（区間の合計をすぐ求めるため） */
+function prefixSum(data: Float32Array): Float64Array {
+  const out = new Float64Array(data.length + 1);
+  for (let i = 0; i < data.length; i++) out[i + 1] = out[i] + data[i];
+  return out;
 }
 
 function hasAudioEffects(obj: TimelineObject): boolean {

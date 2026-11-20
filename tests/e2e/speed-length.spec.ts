@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addObjectAt, disableFileSystemAccess, timelineObjects } from './helpers';
+import { addObjectAt, disableFileSystemAccess, previewPixel, timelineObjects } from './helpers';
 
 const VIDEO = 'tests/fixtures/sample-vp9-opus.webm';
 
@@ -66,4 +66,31 @@ test('速度と長さの変更は 1 回の「元に戻す」で戻る', async ({
   await page.getByRole('button', { name: '元に戻す' }).click();
   await expect(length).toHaveValue('60');
   await expect(page.getByLabel('再生速度', { exact: true })).toHaveValue('100');
+});
+
+test('再生速度は 10000% まで上げられ、速い再生中もプレビューに映像が出る', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: '追加…' }).click();
+  await (await chooser).setFiles(VIDEO);
+  await page.locator('.asset-item').first().dblclick();
+  // ループさせて長さを保ったまま、50 倍速にする（キーフレームだけを表示する速さ）
+  await page.getByLabel('ループ再生').check();
+  await setSpeed(page, '5000');
+  await expect(page.getByLabel('長さ')).toHaveValue('60');
+  // 上限より大きい値は 10000 にする
+  await setSpeed(page, '20000');
+  await page.getByLabel('再生速度', { exact: true }).blur();
+  await expect(page.getByLabel('再生速度', { exact: true })).toHaveValue('10000');
+  await setSpeed(page, '5000');
+
+  await page.getByRole('button', { name: '再生', exact: true }).click();
+  await page.waitForTimeout(1500);
+  const [r, g, b] = await previewPixel(page, 0.5, 0.5);
+  // 素材は赤→青の動画。どちらかの色が出ている（黒のままではない）
+  expect(r > 150 || b > 150).toBe(true);
+  expect(g).toBeLessThan(100);
+  await page.getByRole('button', { name: '停止', exact: true }).click();
+  expect(errors).toEqual([]);
 });

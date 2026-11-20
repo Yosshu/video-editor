@@ -1,4 +1,4 @@
-import { VideoSampleSink, type VideoSample } from 'mediabunny';
+import { EncodedPacketSink, VideoSampleSink, type VideoSample } from 'mediabunny';
 import type { VideoFrameRef } from '../compose';
 import type { MediaSourceHandle } from './mediaSource';
 
@@ -8,6 +8,15 @@ const QUEUE_SIZE = 6;
 const RESTART_GAP = 1.5;
 /** 使われなくなった読み込み口を閉じるまでの時間（ミリ秒） */
 const IDLE_MS = 5000;
+/**
+ * 再生中に 1 秒あたりこれだけのフレームをデコードする必要があれば（速度 × 素材の fps）、
+ * 順番にデコードするのをやめてキーフレームだけを表示する（30fps の素材なら 1600% を超えたとき）
+ */
+const KEY_ONLY_ENTER = 480;
+/** キーフレームだけの表示をやめる値（行ったり来たりしないよう少し下げる） */
+const KEY_ONLY_EXIT = 400;
+/** 再生の速さを見積もるのに使う直近の要求の数 */
+const RATE_WINDOW = 12;
 
 let versionSeq = 0;
 
@@ -24,6 +33,9 @@ interface CurrentFrame {
  */
 class ObjectVideoReader {
   private sink: VideoSampleSink;
+  private packets: EncodedPacketSink;
+  /** 素材のフレームレート（調べ終わるまでは 30 とみなす） */
+  private fps = 30;
   current: CurrentFrame | null = null;
   lastUsed = performance.now();
   // 停止中のシーク
@@ -38,12 +50,27 @@ class ObjectVideoReader {
   private ended = false;
   private generation = 0;
   private disposed = false;
+  // 速い再生のときのキーフレームだけの表示
+  /** 直近の要求どうしの間隔（経過時間ミリ秒と、進んだ素材内の時間秒） */
+  private history: { wall: number; t: number }[] = [];
+  private last: { wall: number; t: number } | null = null;
+  private keyOnly = false;
+  private keyBusy = false;
+  private keyPending: number | null = null;
+  private keyShown: number | null = null;
 
   constructor(
     readonly handle: MediaSourceHandle,
     private onReady: () => void,
   ) {
     this.sink = new VideoSampleSink(handle.videoTrack!);
+    this.packets = new EncodedPacketSink(handle.videoTrack!);
+    void handle
+      .videoTrack!.computePacketStats(60)
+      .then((s) => {
+        if (s.averagePacketRate > 0) this.fps = s.averagePacketRate;
+      })
+      .catch(() => undefined);
   }
 
   private setCurrent(sample: VideoSample): void {
@@ -68,6 +95,10 @@ class ObjectVideoReader {
 
   /** 停止中：正確なフレームを取り出す（連続した要求は最後のものだけ処理する） */
   requestExact(t: number): void {
+    this.history = [];
+    this.last = null;
+    this.keyOnly = false;
+    this.keyShown = null;
     if (this.covers(t) || this.resolvedFor === t) return;
     if (this.seeking) {
       this.pendingSeek = t;
@@ -100,6 +131,10 @@ class ObjectVideoReader {
   /** 再生中：先読みしたフレームから t に当たるものを選ぶ */
   advance(t: number): void {
     this.resolvedFor = null;
+    if (this.updateKeyOnly(t)) {
+      this.advanceKey(t);
+      return;
+    }
     const c = this.current;
     const needRestart =
       !this.iter ||
@@ -111,6 +146,65 @@ class ObjectVideoReader {
       this.setCurrent(this.queue.shift()!);
     }
     this.pump();
+  }
+
+  /**
+   * 直近の要求から 1 秒あたりに必要なデコード数を見積もり、キーフレームだけの表示にするか決める
+   * （オブジェクトの速度のほか、時間制御などで速くなっている場合も含む）
+   */
+  private updateKeyOnly(t: number): boolean {
+    const now = performance.now();
+    const last = this.last;
+    this.last = { wall: now, t };
+    // 前へ進んだ区間だけを数える（ループで戻った区間は使わない）
+    if (last && t >= last.t && now > last.wall) {
+      this.history.push({ wall: now - last.wall, t: t - last.t });
+      if (this.history.length > RATE_WINDOW) this.history.shift();
+    }
+    const h = this.history;
+    const seconds = h.reduce((a, x) => a + x.wall, 0) / 1000;
+    if (h.length >= 4 && seconds > 0.05) {
+      const perSecond = (h.reduce((a, x) => a + x.t, 0) / seconds) * this.fps;
+      if (!this.keyOnly && perSecond > KEY_ONLY_ENTER) {
+        this.keyOnly = true;
+        this.stopIteration();
+      } else if (this.keyOnly && perSecond < KEY_ONLY_EXIT) {
+        this.keyOnly = false;
+        this.keyShown = null;
+      }
+    }
+    return this.keyOnly;
+  }
+
+  /** 速い再生中：t より前の最も近いキーフレームだけをデコードして表示する */
+  private advanceKey(t: number): void {
+    if (this.keyBusy) {
+      this.keyPending = t;
+      return;
+    }
+    this.keyBusy = true;
+    void (async () => {
+      try {
+        const key = await this.packets.getKeyPacket(Math.max(0, t), { metadataOnly: true });
+        const ts = key?.timestamp ?? 0;
+        if (!this.disposed && ts !== this.keyShown) {
+          const sample = await this.sink.getSample(ts);
+          if (this.disposed) sample?.close();
+          else if (sample) {
+            this.setCurrent(sample);
+            this.keyShown = ts;
+            this.onReady();
+          }
+        }
+      } catch (e) {
+        console.warn('動画のキーフレームを取得できませんでした', e);
+      } finally {
+        this.keyBusy = false;
+        const next = this.keyPending;
+        this.keyPending = null;
+        if (next !== null && this.keyOnly && !this.disposed) this.advanceKey(next);
+      }
+    })();
   }
 
   private stopIteration(): void {

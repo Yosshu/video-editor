@@ -82,6 +82,35 @@ describe('mixScene', () => {
     expect(kept).toBeLessThan(460);
   });
 
+  it('速くするときは高い音を落としてから間引き、4 倍を超えると音を出さない', async () => {
+    // 48kHz・20kHz の音（2 倍速でそのまま間引くと、大きな雑音として残る）
+    const high: PcmReader = {
+      read: async (start, end) => {
+        const n = Math.round((end - start) * 48000);
+        const ch = Float32Array.from({ length: n }, (_, i) =>
+          Math.sin(2 * Math.PI * 20000 * (start + i / 48000)),
+        );
+        return { start, sampleRate: 48000, channels: [ch] };
+      },
+      dispose: () => undefined,
+    };
+    const project = createProject({ sampleRate: 48000, fps: { num: 10, den: 1 } });
+    const sources: MixSources = { reader: () => high, assetDuration: () => 100 };
+    const rms = async (speed: number) => {
+      project.scenes[0].objects = [
+        createObject('audio', 1, 0, 10, { assetId: 'a', params: { speed } }),
+      ];
+      const [l] = await mixScene(project, project.scenes[0], 0.2, 4800, sources);
+      return Math.sqrt(l.reduce((s, v) => s + v * v, 0) / l.length);
+    };
+    // そのままなら約 0.71（振幅 1 の正弦波）
+    expect(await rms(100)).toBeGreaterThan(0.6);
+    expect(await rms(200)).toBeLessThan(0.3);
+    expect(await rms(400)).toBeLessThan(0.3);
+    expect(await rms(401)).toBe(0);
+    expect(await rms(10000)).toBe(0);
+  });
+
   it('音量・パン・フェードを適用する', async () => {
     const obj = createObject('audio', 1, 0, 20, {
       assetId: 'a',
