@@ -33,7 +33,8 @@ jobs:
 
   e2e:
     name: E2E テスト
-    runs-on: ubuntu-latest
+    # ubuntu-latest が新しい版に変わると Playwright がブラウザを入れられないことがあるので、版を固定する
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
